@@ -500,13 +500,13 @@
             
             showLoading();
             
-            fetch('/send_message', {
+            fetch('/introduce_character', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: `ГМ: Изучи моего персонажа детально и запомни всю информацию о нем:\n\n${currentCharacter}\n\nТеперь ты знаешь моего персонажа. Подтверди, что ты изучил и запомнил всю информацию о нем.`
+                    character: currentCharacter
                 })
             })
             .then(response => response.json())

@@ -368,6 +368,36 @@ def start_game():
 
     return jsonify({"response": response})
 
+@app.route('/introduce_character', methods=['POST'])
+@login_required
+def introduce_character():
+    """Отдельный эндпоинт для представления персонажа ИИ"""
+    data = request.get_json()
+    character_description = data.get('character')
+    
+    if not character_description:
+        return jsonify({"error": "Персонаж не передан"})
+    
+    # Сохраняем персонажа в сессии
+    session['character'] = character_description
+    
+    conversation_history = session.get('conversation_history', [])
+    system_prompt = session.get('system_prompt', '')
+    
+    # Создаем специальное сообщение для представления персонажа
+    introduce_message = f"ГМ: Изучи моего персонажа детально и запомни всю информацию о нем:\n\n{character_description}\n\nТеперь ты знаешь моего персонажа. Подтверди, что ты изучил и запомнил всю информацию о нем."
+    
+    response = chat_with_ai(introduce_message, system_prompt, conversation_history)
+    
+    if response and response.strip():
+        conversation_history.extend([
+            {"role": "user", "content": "🤖 Представляю своего персонажа ИИ"},
+            {"role": "assistant", "content": response}
+        ])
+        session['conversation_history'] = conversation_history
+    
+    return jsonify({"response": response})
+
 @app.route('/send_message', methods=['POST'])
 @login_required
 def send_message():
