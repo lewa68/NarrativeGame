@@ -185,8 +185,14 @@ def start_game():
     
     session['conversation_history'] = []
     session['system_prompt'] = system_prompt
+    session['character'] = None
     
-    response = chat_with_ai("Начни игру с предложения выбрать сеттинг", system_prompt, [])
+    # Проверяем, есть ли персонаж
+    if 'character' not in session or not session['character']:
+        response = "🎭 **Добро пожаловать в игру!**\n\nПрежде чем начать, мне нужно знать вашего персонажа. У вас есть два варианта:\n\n1. **Загрузить готового персонажа** - используйте кнопку загрузки файла выше\n2. **Создать нового персонажа** - напишите 'создать персонажа' и я помогу вам создать уникального героя\n\nЧто выберете?"
+    else:
+        character_info = session['character']
+        response = chat_with_ai(f"Начни игру для персонажа: {character_info}", system_prompt, [])
     
     if response and response.strip():
         session['conversation_history'] = [
@@ -204,10 +210,24 @@ def send_message():
     if not user_message:
         return jsonify({"error": "Пустое сообщение"})
     
+    # Проверяем, запрашивает ли игрок создание персонажа
+    if 'создать персонажа' in user_message.lower() or 'создание персонажа' in user_message.lower():
+        return create_character_start()
+    
+    # Проверяем, есть ли персонаж
+    if not session.get('character'):
+        return jsonify({
+            "response": "⚠️ Сначала нужно создать или загрузить персонажа! Напишите 'создать персонажа' или используйте кнопку загрузки файла."
+        })
+    
     conversation_history = session.get('conversation_history', [])
     system_prompt = session.get('system_prompt', '')
     
-    response = chat_with_ai(user_message, system_prompt, conversation_history)
+    # Добавляем информацию о персонаже в контекст
+    character_info = session.get('character')
+    enhanced_prompt = f"{user_message}\n\n[ПЕРСОНАЖ ИГРОКА: {character_info}]"
+    
+    response = chat_with_ai(enhanced_prompt, system_prompt, conversation_history)
     
     if response and response.strip():
         conversation_history.extend([
@@ -218,13 +238,30 @@ def send_message():
     
     return jsonify({"response": response})
 
+def create_character_start():
+    """Начинает процесс создания персонажа"""
+    session['character_creation_history'] = []
+    
+    response = """🎭 **СОЗДАНИЕ ПЕРСОНАЖА**
+
+Отлично! Давайте создадим вашего персонажа. Я задам вам несколько вопросов, чтобы лучше понять, кого вы хотите играть.
+
+**Первый вопрос:** Как зовут вашего персонажа и в каком мире или сеттинге вы хотели бы играть? (фэнтези, современность, киберпанк, космос и т.д.)"""
+    
+    return jsonify({
+        "response": response,
+        "character_creation": True
+    })
+
 @app.route('/save_game', methods=['POST'])
 def save_game():
     """Сохраняет текущую игру"""
     conversation_history = session.get('conversation_history', [])
+    character = session.get('character')
     save_data = {
         "timestamp": datetime.now().isoformat(),
-        "conversation_history": conversation_history
+        "conversation_history": conversation_history,
+        "character": character
     }
     
     with open("game_save.json", "w", encoding="utf-8") as f:
@@ -240,10 +277,138 @@ def load_game():
             save_data = json.load(f)
         
         session['conversation_history'] = save_data.get('conversation_history', [])
+        session['character'] = save_data.get('character', None)
         return jsonify({"message": "Игра загружена", "timestamp": save_data.get('timestamp')})
     
     except FileNotFoundError:
         return jsonify({"error": "Файл сохранения не найден"})
+
+@app.route('/upload_character', methods=['POST'])
+def upload_character():
+    """Загружает файл персонажа"""
+    if 'character_file' not in request.files:
+        return jsonify({"error": "Файл не выбран"})
+    
+    file = request.files['character_file']
+    if file.filename == '':
+        return jsonify({"error": "Файл не выбран"})
+    
+    try:
+        # Читаем содержимое файла
+        content = file.read().decode('utf-8')
+        
+        # Пытаемся распарсить как JSON
+        try:
+            character_data = json.loads(content)
+            # Создаем читаемое описание персонажа
+            character_description = format_character_description(character_data)
+        except json.JSONDecodeError:
+            # Если не JSON, используем как текст
+            character_description = content
+        
+        session['character'] = character_description
+        return jsonify({"message": "Персонаж загружен успешно", "character": character_description})
+    
+    except Exception as e:
+        return jsonify({"error": f"Ошибка при загрузке файла: {str(e)}"})
+
+@app.route('/create_character', methods=['POST'])
+def create_character():
+    """Создает персонажа через взаимодействие с ГМ"""
+    data = request.get_json()
+    user_input = data.get('input', '')
+    
+    system_prompt = session.get('system_prompt', '')
+    creation_history = session.get('character_creation_history', [])
+    
+    # Специальный промпт для создания персонажа
+    character_creation_prompt = f"""
+{system_prompt}
+
+РЕЖИМ СОЗДАНИЯ ПЕРСОНАЖА:
+Ты помогаешь игроку создать персонажа. Задавай вопросы о:
+- Имени и внешности
+- Предыстории и характере  
+- Навыках и способностях
+- Снаряжении и особенностях
+
+Когда персонаж будет готов, заверши описанием в формате:
+=== ПЕРСОНАЖ СОЗДАН ===
+[Полное описание персонажа]
+=== КОНЕЦ ОПИСАНИЯ ===
+"""
+    
+    response = chat_with_ai(user_input, character_creation_prompt, creation_history)
+    
+    # Проверяем, завершено ли создание персонажа
+    if "=== ПЕРСОНАЖ СОЗДАН ===" in response:
+        # Извлекаем описание персонажа
+        start_marker = "=== ПЕРСОНАЖ СОЗДАН ==="
+        end_marker = "=== КОНЕЦ ОПИСАНИЯ ==="
+        
+        start_idx = response.find(start_marker) + len(start_marker)
+        end_idx = response.find(end_marker)
+        
+        if end_idx > start_idx:
+            character_description = response[start_idx:end_idx].strip()
+            session['character'] = character_description
+            session.pop('character_creation_history', None)  # Очищаем историю создания
+            
+            return jsonify({
+                "response": response,
+                "character_created": True,
+                "character": character_description
+            })
+    
+    # Продолжаем процесс создания
+    creation_history.extend([
+        {"role": "user", "content": user_input},
+        {"role": "assistant", "content": response}
+    ])
+    session['character_creation_history'] = creation_history
+    
+    return jsonify({"response": response, "character_created": False})
+
+def format_character_description(character_data):
+    """Форматирует данные персонажа из JSON в читаемый текст"""
+    if isinstance(character_data, dict):
+        description = "=== ПЕРСОНАЖ ===\n"
+        
+        # Основная информация
+        if 'name' in character_data:
+            description += f"Имя: {character_data['name']}\n"
+        if 'race' in character_data:
+            description += f"Раса: {character_data['race']}\n"
+        if 'class' in character_data:
+            description += f"Класс: {character_data['class']}\n"
+        if 'level' in character_data:
+            description += f"Уровень: {character_data['level']}\n"
+        
+        # Характеристики
+        if 'stats' in character_data:
+            description += "\nХарактеристики:\n"
+            for stat, value in character_data['stats'].items():
+                description += f"- {stat}: {value}\n"
+        
+        # Навыки
+        if 'skills' in character_data:
+            description += "\nНавыки:\n"
+            for skill in character_data['skills']:
+                description += f"- {skill}\n"
+        
+        # Снаряжение
+        if 'equipment' in character_data:
+            description += "\nСнаряжение:\n"
+            for item in character_data['equipment']:
+                description += f"- {item}\n"
+        
+        # Предыстория
+        if 'background' in character_data:
+            description += f"\nПредыстория: {character_data['background']}\n"
+        
+        return description
+    
+    return str(character_data)
 
 # Консольная версия (для обратной совместимости)
 def console_main():

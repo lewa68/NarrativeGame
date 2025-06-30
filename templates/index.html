@@ -151,8 +151,29 @@
             text-align: center;
         }
 
+        .controls h4 {
+            margin-bottom: 10px;
+            text-align: center;
+            color: #ffd700;
+        }
+
         .control-group {
             margin-bottom: 15px;
+        }
+
+        .character-info {
+            background: rgba(255,215,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            border-left: 3px solid #ffd700;
+        }
+
+        #characterFile {
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            border: 1px solid #ccc;
         }
 
         .loading {
@@ -232,6 +253,17 @@
             <h3>🎮 Управление</h3>
             
             <div class="control-group">
+                <h4>👤 Персонаж</h4>
+                <input type="file" id="characterFile" accept=".json,.txt" style="width: 100%; margin-bottom: 10px; padding: 5px; border-radius: 5px;">
+                <button class="action-btn" onclick="uploadCharacter()" style="width: 100%; margin-bottom: 10px;">
+                    📤 Загрузить персонажа
+                </button>
+                <button class="action-btn" onclick="createCharacter()" style="width: 100%; margin-bottom: 20px;">
+                    ✨ Создать персонажа
+                </button>
+            </div>
+            
+            <div class="control-group">
                 <button class="action-btn" onclick="saveGame()" style="width: 100%; margin-bottom: 10px;">
                     💾 Сохранить игру
                 </button>
@@ -243,9 +275,10 @@
             <div class="control-group">
                 <h4>💡 Подсказки:</h4>
                 <ul style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">
+                    <li>Создайте или загрузите персонажа перед игрой</li>
                     <li>Добавьте "ГМ:" для получения вариантов действий</li>
-                    <li>Игра автоматически оптимизирует контекст</li>
-                    <li>Все действия сохраняются в сессии</li>
+                    <li>Поддерживаются файлы JSON и TXT</li>
+                    <li>Персонаж сохраняется вместе с игрой</li>
                 </ul>
             </div>
 
@@ -405,6 +438,74 @@
             .catch(error => {
                 alert('Ошибка загрузки: ' + error.message);
             });
+        }
+
+        function uploadCharacter() {
+            const fileInput = document.getElementById('characterFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Пожалуйста, выберите файл персонажа');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('character_file', file);
+            
+            fetch('/upload_character', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Ошибка загрузки персонажа: ' + data.error);
+                } else {
+                    alert('✅ ' + data.message);
+                    showCharacterInfo(data.character);
+                    fileInput.value = ''; // Очищаем поле файла
+                }
+            })
+            .catch(error => {
+                alert('Ошибка загрузки персонажа: ' + error.message);
+            });
+        }
+
+        function createCharacter() {
+            // Переходим в режим создания персонажа
+            if (document.getElementById('game-area').style.display === 'none') {
+                // Если игра еще не начата, начинаем с создания персонажа
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('game-area').style.display = 'flex';
+            }
+            
+            // Отправляем запрос на создание персонажа
+            const messageInput = document.getElementById('messageInput');
+            messageInput.value = 'создать персонажа';
+            sendMessage();
+        }
+
+        function showCharacterInfo(character) {
+            // Показываем информацию о персонаже в интерфейсе
+            const controlsDiv = document.querySelector('.controls');
+            
+            // Удаляем старую информацию о персонаже
+            const oldInfo = controlsDiv.querySelector('.character-info');
+            if (oldInfo) {
+                oldInfo.remove();
+            }
+            
+            // Добавляем новую информацию
+            const characterDiv = document.createElement('div');
+            characterDiv.className = 'character-info';
+            characterDiv.innerHTML = `
+                <strong>👤 Текущий персонаж:</strong><br>
+                <small>${character.substring(0, 100)}${character.length > 100 ? '...' : ''}</small>
+            `;
+            
+            // Вставляем после заголовка управления
+            const h3 = controlsDiv.querySelector('h3');
+            h3.insertAdjacentElement('afterend', characterDiv);
         }
     </script>
 </body>
