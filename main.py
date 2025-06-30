@@ -1,17 +1,56 @@
+
 import pip
 pip.main(['install', 'flask'])
+pip.main(['install', 'werkzeug'])
 import requests
 import json
 import os
-from flask import Flask, render_template, request, jsonify, session
+import sqlite3
+import hashlib
 import secrets
 from datetime import datetime
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
 
 API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 MODEL = "deepseek/deepseek-r1"
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
+
+# Инициализация базы данных
+def init_db():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  username TEXT UNIQUE NOT NULL,
+                  password_hash TEXT NOT NULL,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    conn.commit()
+    conn.close()
+
+# Создание пользовательских папок
+def create_user_folder(username, user_id):
+    folder_name = f"{username}@{user_id}"
+    folder_path = os.path.join("user_data", folder_name)
+    os.makedirs(folder_path, exist_ok=True)
+    os.makedirs(os.path.join(folder_path, "saves"), exist_ok=True)
+    os.makedirs(os.path.join(folder_path, "characters"), exist_ok=True)
+    return folder_path
+
+def get_user_folder(username, user_id):
+    folder_name = f"{username}@{user_id}"
+    return os.path.join("user_data", folder_name)
+
+# Проверка аутентификации
+def login_required(f):
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({"error": "Требуется авторизация", "need_login": True})
+        return f(*args, **kwargs)
+    decorated_function.__name__ = f.__name__
+    return decorated_function
 
 class ContextManager:
     def __init__(self, max_tokens=8000, summary_threshold=15):
@@ -173,12 +212,150 @@ def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
 # Веб-интерфейс
 @app.route('/')
 def index():
-    return render_template('index.html')
+    if 'user_id' in session:
+        return render_template('game.html')
+    return render_template('auth.html')
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    
+    if not username or not password:
+        return jsonify({"error": "Логин и пароль не могут быть пустыми"})
+    
+    if len(username) < 3:
+        return jsonify({"error": "Логин должен содержать минимум 3 символа"})
+    
+    if len(password) < 6:
+        return jsonify({"error": "Пароль должен содержать минимум 6 символов"})
+    
+    try:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        
+        # Проверяем, существует ли пользователь
+        c.execute("SELECT id FROM users WHERE username = ?", (username,))
+        if c.fetchone():
+            conn.close()
+            return jsonify({"error": "Пользователь с таким логином уже существует"})
+        
+        # Создаем пользователя
+        password_hash = generate_password_hash(password)
+        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
+                 (username, password_hash))
+        user_id = c.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # Создаем папку пользователя
+        create_user_folder(username, user_id)
+        
+        # Логинимся
+        session['user_id'] = user_id
+        session['username'] = username
+        
+        return jsonify({"success": True, "message": "Регистрация успешна!"})
+        
+    except Exception as e:
+        return jsonify({"error": f"Ошибка регистрации: {str(e)}"})
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    
+    if not username or not password:
+        return jsonify({"error": "Логин и пароль не могут быть пустыми"})
+    
+    try:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+        user = c.fetchone()
+        conn.close()
+        
+        if not user or not check_password_hash(user[1], password):
+            return jsonify({"error": "Неверный логин или пароль"})
+        
+        session['user_id'] = user[0]
+        session['username'] = username
+        
+        return jsonify({"success": True, "message": "Вход выполнен успешно!"})
+        
+    except Exception as e:
+        return jsonify({"error": f"Ошибка входа: {str(e)}"})
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({"success": True})
+
+@app.route('/get_user_info', methods=['GET'])
+@login_required
+def get_user_info():
+    return jsonify({
+        "username": session['username'],
+        "user_id": session['user_id']
+    })
+
+@app.route('/get_saves', methods=['GET'])
+@login_required
+def get_saves():
+    """Получает список сохранений пользователя"""
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    saves_folder = os.path.join(user_folder, "saves")
+    
+    saves = []
+    if os.path.exists(saves_folder):
+        for filename in os.listdir(saves_folder):
+            if filename.endswith('.json'):
+                filepath = os.path.join(saves_folder, filename)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        save_data = json.load(f)
+                    saves.append({
+                        "filename": filename[:-5],  # убираем .json
+                        "timestamp": save_data.get('timestamp', 'Неизвестно'),
+                        "character_name": save_data.get('character_name', 'Неизвестный персонаж')
+                    })
+                except:
+                    continue
+    
+    return jsonify({"saves": saves})
+
+@app.route('/get_characters', methods=['GET'])
+@login_required
+def get_characters():
+    """Получает список персонажей пользователя"""
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    characters_folder = os.path.join(user_folder, "characters")
+    
+    characters = []
+    if os.path.exists(characters_folder):
+        for filename in os.listdir(characters_folder):
+            if filename.endswith('.json'):
+                filepath = os.path.join(characters_folder, filename)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        char_data = json.load(f)
+                    characters.append({
+                        "filename": filename[:-5],  # убираем .json
+                        "name": char_data.get('name', filename[:-5]),
+                        "description": char_data.get('description', '')[:100] + '...'
+                    })
+                except:
+                    continue
+    
+    return jsonify({"characters": characters})
 
 @app.route('/start_game', methods=['POST'])
+@login_required
 def start_game():
     if not API_KEY:
-        return jsonify({"error": "API ключ не найден. Добавьте OPENROUTER_API_KEY в Secrets."})
+        return jsonify({"error": "API ключ не найден. Добавьте OPENROUTER_API_KEY в переменные окружения."})
     
     rules = load_gm_rules()
     system_prompt = create_gm_system_prompt(rules)
@@ -186,10 +363,11 @@ def start_game():
     session['conversation_history'] = []
     session['system_prompt'] = system_prompt
     session['character'] = None
+    session['character_creation_mode'] = False
     
     # Проверяем, есть ли персонаж
     if 'character' not in session or not session['character']:
-        response = "🎭 **Добро пожаловать в игру!**\n\nПрежде чем начать, мне нужно знать вашего персонажа. У вас есть два варианта:\n\n1. **Загрузить готового персонажа** - используйте кнопку загрузки файла выше\n2. **Создать нового персонажа** - напишите 'создать персонажа' и я помогу вам создать уникального героя\n\nЧто выберете?"
+        response = "🎭 **Добро пожаловать в игру!**\n\nПрежде чем начать, мне нужно знать вашего персонажа. У вас есть три варианта:\n\n1. **Загрузить готового персонажа** - выберите из списка созданных персонажей\n2. **Создать нового персонажа** - напишите 'создать персонажа' и я помогу вам создать уникального героя\n3. **Загрузить файл персонажа** - используйте кнопку загрузки файла\n\nЧто выберете?"
     else:
         character_info = session['character']
         response = chat_with_ai(f"Начни игру для персонажа: {character_info}", system_prompt, [])
@@ -203,12 +381,17 @@ def start_game():
     return jsonify({"response": response})
 
 @app.route('/send_message', methods=['POST'])
+@login_required
 def send_message():
     data = request.get_json()
     user_message = data.get('message', '')
     
     if not user_message:
         return jsonify({"error": "Пустое сообщение"})
+    
+    # Проверяем, находимся ли в режиме создания персонажа
+    if session.get('character_creation_mode'):
+        return create_character_continue(user_message)
     
     # Проверяем, запрашивает ли игрок создание персонажа
     if 'создать персонажа' in user_message.lower() or 'создание персонажа' in user_message.lower():
@@ -217,7 +400,7 @@ def send_message():
     # Проверяем, есть ли персонаж
     if not session.get('character'):
         return jsonify({
-            "response": "⚠️ Сначала нужно создать или загрузить персонажа! Напишите 'создать персонажа' или используйте кнопку загрузки файла."
+            "response": "⚠️ Сначала нужно создать или загрузить персонажа! Напишите 'создать персонажа' или выберите персонажа из списка."
         })
     
     conversation_history = session.get('conversation_history', [])
@@ -241,6 +424,7 @@ def send_message():
 def create_character_start():
     """Начинает процесс создания персонажа"""
     session['character_creation_history'] = []
+    session['character_creation_mode'] = True
     
     response = """🎭 **СОЗДАНИЕ ПЕРСОНАЖА**
 
@@ -253,37 +437,196 @@ def create_character_start():
         "character_creation": True
     })
 
+def create_character_continue(user_input):
+    """Продолжает процесс создания персонажа"""
+    system_prompt = session.get('system_prompt', '')
+    creation_history = session.get('character_creation_history', [])
+    
+    # Специальный промпт для создания персонажа
+    character_creation_prompt = f"""
+{system_prompt}
+
+РЕЖИМ СОЗДАНИЯ ПЕРСОНАЖА:
+Ты помогаешь игроку создать персонажа. Задавай вопросы о:
+- Имени и внешности
+- Предыстории и характере  
+- Навыках и способностях
+- Снаряжении и особенностях
+
+Когда персонаж будет готов (после 4-5 вопросов), заверши описанием в формате:
+=== ПЕРСОНАЖ СОЗДАН ===
+Имя: [имя]
+[Полное описание персонажа]
+=== КОНЕЦ ОПИСАНИЯ ===
+"""
+    
+    response = chat_with_ai(user_input, character_creation_prompt, creation_history)
+    
+    # Проверяем, завершено ли создание персонажа
+    if "=== ПЕРСОНАЖ СОЗДАН ===" in response:
+        # Извлекаем описание персонажа
+        start_marker = "=== ПЕРСОНАЖ СОЗДАН ==="
+        end_marker = "=== КОНЕЦ ОПИСАНИЯ ==="
+        
+        start_idx = response.find(start_marker) + len(start_marker)
+        end_idx = response.find(end_marker)
+        
+        if end_idx > start_idx:
+            character_description = response[start_idx:end_idx].strip()
+            session['character'] = character_description
+            session['character_creation_mode'] = False
+            session.pop('character_creation_history', None)
+            
+            # Сохраняем персонажа
+            save_character_to_file(character_description)
+            
+            return jsonify({
+                "response": response,
+                "character_created": True,
+                "character": character_description
+            })
+    
+    # Продолжаем процесс создания
+    creation_history.extend([
+        {"role": "user", "content": user_input},
+        {"role": "assistant", "content": response}
+    ])
+    session['character_creation_history'] = creation_history
+    
+    return jsonify({"response": response, "character_created": False})
+
+def save_character_to_file(character_description):
+    """Сохраняет персонажа в файл"""
+    try:
+        # Извлекаем имя персонажа
+        lines = character_description.split('\n')
+        character_name = "Безымянный"
+        for line in lines:
+            if line.startswith('Имя:'):
+                character_name = line.replace('Имя:', '').strip()
+                break
+        
+        user_folder = get_user_folder(session['username'], session['user_id'])
+        characters_folder = os.path.join(user_folder, "characters")
+        
+        character_data = {
+            "name": character_name,
+            "description": character_description,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        # Создаем безопасное имя файла
+        safe_name = "".join(c for c in character_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        filename = f"{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        
+        with open(os.path.join(characters_folder, filename), 'w', encoding='utf-8') as f:
+            json.dump(character_data, f, ensure_ascii=False, indent=2)
+            
+    except Exception as e:
+        print(f"Ошибка сохранения персонажа: {e}")
+
+@app.route('/load_character', methods=['POST'])
+@login_required
+def load_character():
+    """Загружает персонажа из сохраненных"""
+    data = request.get_json()
+    filename = data.get('filename')
+    
+    if not filename:
+        return jsonify({"error": "Не указано имя файла"})
+    
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    filepath = os.path.join(user_folder, "characters", f"{filename}.json")
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            character_data = json.load(f)
+        
+        session['character'] = character_data['description']
+        return jsonify({
+            "success": True,
+            "character": character_data['description'],
+            "message": f"Персонаж '{character_data['name']}' загружен"
+        })
+        
+    except FileNotFoundError:
+        return jsonify({"error": "Файл персонажа не найден"})
+    except Exception as e:
+        return jsonify({"error": f"Ошибка загрузки персонажа: {str(e)}"})
+
 @app.route('/save_game', methods=['POST'])
+@login_required
 def save_game():
     """Сохраняет текущую игру"""
+    data = request.get_json()
+    save_name = data.get('save_name', f"save_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    
     conversation_history = session.get('conversation_history', [])
     character = session.get('character')
+    
+    # Извлекаем имя персонажа
+    character_name = "Неизвестный персонаж"
+    if character:
+        lines = character.split('\n')
+        for line in lines:
+            if line.startswith('Имя:'):
+                character_name = line.replace('Имя:', '').strip()
+                break
+    
     save_data = {
         "timestamp": datetime.now().isoformat(),
         "conversation_history": conversation_history,
-        "character": character
+        "character": character,
+        "character_name": character_name,
+        "save_name": save_name
     }
     
-    with open("game_save.json", "w", encoding="utf-8") as f:
-        json.dump(save_data, f, ensure_ascii=False, indent=2)
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    save_path = os.path.join(user_folder, "saves", f"{save_name}.json")
     
-    return jsonify({"message": "Игра сохранена"})
+    try:
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(save_data, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({"success": True, "message": "Игра сохранена"})
+    except Exception as e:
+        return jsonify({"error": f"Ошибка сохранения: {str(e)}"})
 
 @app.route('/load_game', methods=['POST'])
+@login_required
 def load_game():
     """Загружает сохраненную игру"""
+    data = request.get_json()
+    filename = data.get('filename')
+    
+    if not filename:
+        return jsonify({"error": "Не указано имя файла"})
+    
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    save_path = os.path.join(user_folder, "saves", f"{filename}.json")
+    
     try:
-        with open("game_save.json", "r", encoding="utf-8") as f:
+        with open(save_path, "r", encoding="utf-8") as f:
             save_data = json.load(f)
         
         session['conversation_history'] = save_data.get('conversation_history', [])
         session['character'] = save_data.get('character', None)
-        return jsonify({"message": "Игра загружена", "timestamp": save_data.get('timestamp')})
+        
+        return jsonify({
+            "success": True,
+            "message": "Игра загружена",
+            "timestamp": save_data.get('timestamp'),
+            "character": save_data.get('character'),
+            "history": save_data.get('conversation_history', [])
+        })
     
     except FileNotFoundError:
         return jsonify({"error": "Файл сохранения не найден"})
+    except Exception as e:
+        return jsonify({"error": f"Ошибка загрузки: {str(e)}"})
 
 @app.route('/upload_character', methods=['POST'])
+@login_required
 def upload_character():
     """Загружает файл персонажа"""
     if 'character_file' not in request.files:
@@ -307,67 +650,14 @@ def upload_character():
             character_description = content
         
         session['character'] = character_description
-        return jsonify({"message": "Персонаж загружен успешно", "character": character_description})
+        
+        # Сохраняем загруженного персонажа
+        save_character_to_file(character_description)
+        
+        return jsonify({"success": True, "character": character_description, "message": "Персонаж загружен успешно"})
     
     except Exception as e:
         return jsonify({"error": f"Ошибка при загрузке файла: {str(e)}"})
-
-@app.route('/create_character', methods=['POST'])
-def create_character():
-    """Создает персонажа через взаимодействие с ГМ"""
-    data = request.get_json()
-    user_input = data.get('input', '')
-    
-    system_prompt = session.get('system_prompt', '')
-    creation_history = session.get('character_creation_history', [])
-    
-    # Специальный промпт для создания персонажа
-    character_creation_prompt = f"""
-{system_prompt}
-
-РЕЖИМ СОЗДАНИЯ ПЕРСОНАЖА:
-Ты помогаешь игроку создать персонажа. Задавай вопросы о:
-- Имени и внешности
-- Предыстории и характере  
-- Навыках и способностях
-- Снаряжении и особенностях
-
-Когда персонаж будет готов, заверши описанием в формате:
-=== ПЕРСОНАЖ СОЗДАН ===
-[Полное описание персонажа]
-=== КОНЕЦ ОПИСАНИЯ ===
-"""
-    
-    response = chat_with_ai(user_input, character_creation_prompt, creation_history)
-    
-    # Проверяем, завершено ли создание персонажа
-    if "=== ПЕРСОНАЖ СОЗДАН ===" in response:
-        # Извлекаем описание персонажа
-        start_marker = "=== ПЕРСОНАЖ СОЗДАН ==="
-        end_marker = "=== КОНЕЦ ОПИСАНИЯ ==="
-        
-        start_idx = response.find(start_marker) + len(start_marker)
-        end_idx = response.find(end_marker)
-        
-        if end_idx > start_idx:
-            character_description = response[start_idx:end_idx].strip()
-            session['character'] = character_description
-            session.pop('character_creation_history', None)  # Очищаем историю создания
-            
-            return jsonify({
-                "response": response,
-                "character_created": True,
-                "character": character_description
-            })
-    
-    # Продолжаем процесс создания
-    creation_history.extend([
-        {"role": "user", "content": user_input},
-        {"role": "assistant", "content": response}
-    ])
-    session['character_creation_history'] = creation_history
-    
-    return jsonify({"response": response, "character_created": False})
 
 def format_character_description(character_data):
     """Форматирует данные персонажа из JSON в читаемый текст"""
@@ -410,63 +700,9 @@ def format_character_description(character_data):
     
     return str(character_data)
 
-# Консольная версия (для обратной совместимости)
-def console_main():
-    if not API_KEY:
-        print("❌ Ошибка: API ключ не найден. Добавьте OPENROUTER_API_KEY в Secrets.")
-        return
-        
-    rules = load_gm_rules()
-    system_prompt = create_gm_system_prompt(rules)
-    
-    print("╔" + "="*78 + "╗")
-    print("║" + " "*25 + "НАРРАТИВНАЯ РОЛЕВАЯ ИГРА" + " "*25 + "║")
-    print("║" + " "*78 + "║")
-    print("║  🤖 ГМ: DeepSeek-R1 (специализированная версия для RPG)" + " "*14 + "║")
-    print("║  📝 Для выхода введите 'exit'" + " "*41 + "║")
-    print("║  🌐 Для веб-версии запустите: python main.py web" + " "*23 + "║")
-    print("╚" + "="*78 + "╝")
-    
-    conversation_history = []
-    context_manager = ContextManager()
-    
-    # Первое сообщение от ГМ
-    print("\n🎲 ГЕЙМ МАСТЕР:")
-    print("-" * 40)
-    first_response = chat_with_ai("Начни игру", system_prompt, conversation_history)
-    print(first_response)
-    
-    if first_response:
-        conversation_history.extend([
-            {"role": "user", "content": "Начни игру"},
-            {"role": "assistant", "content": first_response}
-        ])
-
-    while True:
-        print("\n🎮 ВАШ ХОД:")
-        print("-" * 20)
-        user_input = input(">>> ")
-
-        if user_input.lower() == 'exit':
-            print("\n🚪 Завершение работы...")
-            print("Спасибо за игру! 🎲")
-            break
-
-        print("\n" + "="*80 + "\n")
-        print("🎲 ГЕЙМ МАСТЕР:")
-        print("-" * 40)
-        
-        # Оптимизируем контекст перед отправкой
-        conversation_history = context_manager.optimize_context(conversation_history)
-        
-        response = chat_with_ai(user_input, system_prompt, conversation_history)
-        print(response)
-        
-        if response:
-            conversation_history.extend([
-                {"role": "user", "content": user_input},
-                {"role": "assistant", "content": response}
-            ])
+# Инициализация при запуске
+init_db()
+os.makedirs("user_data", exist_ok=True)
 
 if __name__ == "__main__":
     import sys
@@ -474,4 +710,5 @@ if __name__ == "__main__":
         print("🌐 Запуск веб-сервера на http://0.0.0.0:5000")
         app.run(host='0.0.0.0', port=5000, debug=True)
     else:
-        console_main()
+        print("🌐 Запуск веб-сервера на http://0.0.0.0:5000")
+        app.run(host='0.0.0.0', port=5000, debug=True)
