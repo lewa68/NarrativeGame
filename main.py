@@ -1,7 +1,8 @@
 import requests
 import json
+import os
 
-API_KEY = "" # внутри скобок свой апи ключ отсюда https://openrouter.ai/settings/keys
+API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 MODEL = "deepseek/deepseek-r1"
 
 def process_content(content):
@@ -48,6 +49,10 @@ def chat_stream(prompt):
         print()  # Перенос строки после завершения потока
         return ''.join(full_response)
 def main():
+    if not API_KEY:
+        print("Ошибка: API ключ не найден. Добавьте OPENROUTER_API_KEY в Secrets.")
+        return
+        
     print("Чат с DeepSeek-R1 (by Antric)\nДля выхода введите 'exit'\n")
 
     while True:
