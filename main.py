@@ -12,8 +12,8 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
-API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-MODEL = "deepseek/deepseek-r1"
+API_KEY = os.environ.get("NEUROAPI_API_KEY", "sk-jmwLQaqv0OiMLPrQEUsDvsyUmUhzxsLHK1aTXrziI6fFhORn")
+MODEL = "claude-3.5-sonnet"
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
@@ -174,24 +174,24 @@ def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
     messages.extend(optimized_history)
     messages.append({"role": "user", "content": prompt})
 
-    data = {
+    payload = {
         "model": MODEL,
         "messages": messages,
-        "stream": False
+        "max_tokens": 2000
     }
 
     try:
         response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            "https://api.neuroapi.com/v1/chat/completions",
             headers=headers,
-            json=data,
+            json=payload,
             timeout=30
         )
         
         if response.status_code == 402:
-            return "💳 **Ошибка оплаты**: На вашем аккаунте OpenRouter закончились средства или достигнут лимит. Пожалуйста, пополните баланс на https://openrouter.ai/"
+            return "💳 **Ошибка оплаты**: На вашем аккаунте NeuroAPI закончились средства или достигнут лимит. Пожалуйста, пополните баланс."
         elif response.status_code == 401:
-            return "🔑 **Ошибка авторизации**: Проверьте правильность API ключа OpenRouter"
+            return "🔑 **Ошибка авторизации**: Проверьте правильность API ключа NeuroAPI"
         elif response.status_code != 200:
             return f"⚠️ **Ошибка API**: {response.status_code} - {response.text}"
 
@@ -359,7 +359,7 @@ def get_characters():
 @login_required
 def start_game():
     if not API_KEY:
-        return jsonify({"error": "API ключ не найден. Добавьте OPENROUTER_API_KEY в переменные окружения."})
+        return jsonify({"error": "API ключ не найден. Добавьте NEUROAPI_API_KEY в переменные окружения."})
     
     rules = load_gm_rules()
     system_prompt = create_gm_system_prompt(rules)
