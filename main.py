@@ -683,6 +683,50 @@ def load_game():
     except Exception as e:
         return jsonify({"error": f"Ошибка загрузки: {str(e)}"})
 
+@app.route('/delete_character', methods=['POST'])
+@login_required
+def delete_character():
+    """Удаляет персонажа"""
+    data = request.get_json()
+    filename = data.get('filename')
+
+    if not filename:
+        return jsonify({"error": "Не указано имя файла"})
+
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    filepath = os.path.join(user_folder, "characters", f"{filename}.json")
+
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            return jsonify({"success": True, "message": "Персонаж удален"})
+        else:
+            return jsonify({"error": "Файл персонажа не найден"})
+    except Exception as e:
+        return jsonify({"error": f"Ошибка удаления персонажа: {str(e)}"})
+
+@app.route('/delete_save', methods=['POST'])
+@login_required
+def delete_save():
+    """Удаляет сохранение"""
+    data = request.get_json()
+    filename = data.get('filename')
+
+    if not filename:
+        return jsonify({"error": "Не указано имя файла"})
+
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    filepath = os.path.join(user_folder, "saves", f"{filename}.json")
+
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            return jsonify({"success": True, "message": "Сохранение удалено"})
+        else:
+            return jsonify({"error": "Файл сохранения не найден"})
+    except Exception as e:
+        return jsonify({"error": f"Ошибка удаления сохранения: {str(e)}"})
+
 @app.route('/upload_character', methods=['POST'])
 @login_required
 def upload_character():

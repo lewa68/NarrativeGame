@@ -268,12 +268,108 @@
             color: #333;
         }
 
-        #characterFile {
-            background: rgba(255,255,255,0.9);
+        .file-input-container {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .file-input-container input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
             color: #333;
-            border: 1px solid #ccc;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-weight: bold;
+            font-size: 13px;
+            display: block;
+        }
+
+        .file-input-label:hover {
+            background: linear-gradient(135deg, #ffed4e, #ffd700);
+            transform: translateY(-1px);
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #ff4757, #ff3838);
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .delete-btn {
+            background: linear-gradient(135deg, #ff4757, #ff3838);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
             font-size: 12px;
-            padding: 5px;
+            margin-left: 10px;
+            transition: all 0.3s;
+        }
+
+        .delete-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .list-item {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .list-item:hover {
+            background: rgba(255,255,255,0.2);
+            border-left-color: #ffd700;
+        }
+
+        .list-item.selected {
+            background: rgba(255,215,0,0.3);
+            border-left-color: #ffd700;
+        }
+
+        .list-item-content {
+            flex: 1;
         }
 
         @media (max-width: 1200px) {
@@ -315,10 +411,13 @@
             <div class="sidebar-section">
                 <h3>👤 Персонажи</h3>
                 <div id="characters-list"></div>
-                <input type="file" id="characterFile" accept=".json,.txt" style="margin-bottom: 10px;">
+                <div class="file-input-container">
+                    <input type="file" id="characterFile" accept=".json,.txt">
+                    <label for="characterFile" class="file-input-label">📁 Выбрать файл персонажа</label>
+                </div>
                 <button class="action-btn" onclick="uploadCharacter()">📤 Загрузить файл</button>
                 <button class="action-btn" onclick="createCharacter()">✨ Создать нового</button>
-                <button class="action-btn" onclick="introduceCharacterToAI()" id="introduce-btn" style="display: none;">🤖 Представить персонажа ИИ</button>
+                <button class="action-btn" onclick="startSelectedGame()" id="start-game-btn" style="display: none;">🚀 Начать игру</button>
             </div>
 
             <!-- Сохранения -->
@@ -350,9 +449,15 @@
         </div>
     </div>
 
+    <!-- Уведомления -->
+    <div id="notification-container"></div>
+
     <script>
         let currentCharacter = null;
         let userInfo = null;
+        let selectedCharacterFile = null;
+        let selectedSaveFile = null;
+        let gameStarted = false;
 
         // Загружаем информацию о пользователе при загрузке страницы
         window.onload = function() {
@@ -360,6 +465,34 @@
             loadCharacters();
             loadSaves();
         };
+
+        function showNotification(message, type = 'success') {
+            const container = document.getElementById('notification-container');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            container.appendChild(notification);
+            
+            // Показываем уведомление
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            // Убираем уведомление через 3 секунды
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    container.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        function hideStartScreen() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-area').style.display = 'flex';
+            gameStarted = true;
+        }
 
         function loadUserInfo() {
             fetch('/get_user_info')
@@ -416,10 +549,17 @@
                         const item = document.createElement('div');
                         item.className = 'list-item';
                         item.innerHTML = `
-                            <h4>${char.name}</h4>
-                            <p>${char.description}</p>
+                            <div class="list-item-content">
+                                <h4>${char.name}</h4>
+                                <p>${char.description}</p>
+                            </div>
+                            <button class="delete-btn" onclick="deleteCharacter('${char.filename}', event)" title="Удалить персонажа">×</button>
                         `;
-                        item.onclick = () => loadCharacter(char.filename, char.name);
+                        item.onclick = (e) => {
+                            if (!e.target.classList.contains('delete-btn')) {
+                                selectCharacter(char.filename, char.name, item);
+                            }
+                        };
                         list.appendChild(item);
                     });
                 } else {
@@ -452,11 +592,18 @@
                         const item = document.createElement('div');
                         item.className = 'list-item';
                         item.innerHTML = `
-                            <h4>${save.filename}</h4>
-                            <p>${save.character_name}</p>
-                            <p style="font-size: 0.7em;">${new Date(save.timestamp).toLocaleString()}</p>
+                            <div class="list-item-content">
+                                <h4>${save.filename}</h4>
+                                <p>${save.character_name}</p>
+                                <p style="font-size: 0.7em;">${new Date(save.timestamp).toLocaleString()}</p>
+                            </div>
+                            <button class="delete-btn" onclick="deleteSave('${save.filename}', event)" title="Удалить сохранение">×</button>
                         `;
-                        item.onclick = () => loadGame(save.filename);
+                        item.onclick = (e) => {
+                            if (!e.target.classList.contains('delete-btn')) {
+                                selectSave(save.filename, item);
+                            }
+                        };
                         list.appendChild(item);
                     });
                 } else {
@@ -468,7 +615,108 @@
             });
         }
 
-        function loadCharacter(filename, name) {
+        function selectCharacter(filename, name, element) {
+            // Убираем выделение с других элементов
+            document.querySelectorAll('#characters-list .list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.querySelectorAll('#saves-list .list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Выделяем выбранный элемент
+            element.classList.add('selected');
+            
+            selectedCharacterFile = filename;
+            selectedSaveFile = null;
+            
+            showNotification(`Персонаж "${name}" выбран`, 'success');
+            document.getElementById('start-game-btn').style.display = 'block';
+        }
+
+        function selectSave(filename, element) {
+            // Убираем выделение с других элементов
+            document.querySelectorAll('#characters-list .list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.querySelectorAll('#saves-list .list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Выделяем выбранный элемент
+            element.classList.add('selected');
+            
+            selectedSaveFile = filename;
+            selectedCharacterFile = null;
+            
+            showNotification(`Сохранение "${filename}" выбрано`, 'success');
+            document.getElementById('start-game-btn').style.display = 'block';
+        }
+
+        function deleteCharacter(filename, event) {
+            event.stopPropagation();
+            
+            if (confirm('Вы уверены, что хотите удалить этого персонажа?')) {
+                fetch('/delete_character', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({filename: filename})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Персонаж удален', 'success');
+                        loadCharacters();
+                    } else {
+                        showNotification(data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    showNotification('Ошибка удаления: ' + error.message, 'error');
+                });
+            }
+        }
+
+        function deleteSave(filename, event) {
+            event.stopPropagation();
+            
+            if (confirm('Вы уверены, что хотите удалить это сохранение?')) {
+                fetch('/delete_save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({filename: filename})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Сохранение удалено', 'success');
+                        loadSaves();
+                    } else {
+                        showNotification(data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    showNotification('Ошибка удаления: ' + error.message, 'error');
+                });
+            }
+        }
+
+        function startSelectedGame() {
+            if (selectedCharacterFile) {
+                loadCharacterAndStart(selectedCharacterFile);
+            } else if (selectedSaveFile) {
+                loadGameAndStart(selectedSaveFile);
+            }
+        }
+
+        function loadCharacterAndStart(filename) {
+            hideStartScreen();
+            document.getElementById('start-game-btn').style.display = 'none';
+            
             fetch('/load_character', {
                 method: 'POST',
                 headers: {
@@ -476,58 +724,69 @@
                 },
                 body: JSON.stringify({filename: filename})
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Сервер вернул не JSON ответ');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     currentCharacter = data.character;
-                    showCharacterInfo(name, data.character);
-                    alert('✅ ' + data.message);
+                    showNotification('Персонаж загружен, начинаем игру!', 'success');
+                    // Автоматически представляем персонажа и начинаем игру
+                    introduceCharacterToAI();
                 } else {
-                    alert('❌ ' + data.error);
+                    showNotification(data.error, 'error');
                 }
             })
             .catch(error => {
-                alert('Ошибка загрузки персонажа: ' + error.message);
+                showNotification('Ошибка загрузки персонажа: ' + error.message, 'error');
             });
         }
 
-        function showCharacterInfo(name, description) {
-            // Показываем информацию о текущем персонаже
-            let infoDiv = document.querySelector('.character-info');
-            if (!infoDiv) {
-                infoDiv = document.createElement('div');
-                infoDiv.className = 'character-info';
-                document.querySelector('.sidebar').insertBefore(infoDiv, document.querySelector('.sidebar').firstChild);
-            }
+        function loadGameAndStart(filename) {
+            hideStartScreen();
+            document.getElementById('start-game-btn').style.display = 'none';
+            
+            fetch('/load_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({filename: filename})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Игра загружена!', 'success');
 
-            infoDiv.innerHTML = `
-                <strong>👤 Текущий персонаж: ${name}</strong><br>
-                <small>${description.substring(0, 100)}${description.length > 100 ? '...' : ''}</small>
-            `;
+                    // Загружаем историю сообщений
+                    const messages = document.getElementById('messages');
+                    messages.innerHTML = '';
 
-            // Показываем кнопку представления персонажа ИИ
-            document.getElementById('introduce-btn').style.display = 'block';
+                    if (data.history && data.history.length > 0) {
+                        data.history.forEach(msg => {
+                            if (msg.role === 'user') {
+                                addMessage('player', msg.content);
+                            } else if (msg.role === 'assistant') {
+                                addMessage('gm', msg.content);
+                            }
+                        });
+                    }
+
+                    // Загружаем персонажа
+                    if (data.character) {
+                        currentCharacter = data.character;
+                    }
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Ошибка загрузки: ' + error.message, 'error');
+            });
         }
 
         function introduceCharacterToAI() {
             if (!currentCharacter) {
-                alert('Сначала выберите или создайте персонажа');
+                showNotification('Сначала выберите или создайте персонажа', 'error');
                 return;
-            }
-
-            // Переходим в игровую область если еще не там
-            if (document.getElementById('game-area').style.display === 'none') {
-                document.getElementById('start-screen').style.display = 'none';
-                document.getElementById('game-area').style.display = 'flex';
             }
 
             // Отправляем полное описание персонажа ИИ
@@ -582,8 +841,7 @@
         }
 
         function startGame() {
-            document.getElementById('start-screen').style.display = 'none';
-            document.getElementById('game-area').style.display = 'flex';
+            hideStartScreen();
 
             showLoading();
 
@@ -783,61 +1041,14 @@
             });
         }
 
-        function loadGame(filename) {
-            if (!confirm('Загрузить эту игру? Текущий прогресс будет потерян.')) {
-                return;
-            }
-
-            fetch('/load_game', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({filename: filename})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert('❌ ' + data.error);
-                } else {
-                    alert('✅ ' + data.message);
-
-                    // Загружаем историю сообщений
-                    const messages = document.getElementById('messages');
-                    messages.innerHTML = '';
-
-                    if (data.history && data.history.length > 0) {
-                        data.history.forEach(msg => {
-                            if (msg.role === 'user') {
-                                addMessage('player', msg.content);
-                            } else if (msg.role === 'assistant') {
-                                addMessage('gm', msg.content);
-                            }
-                        });
-                    }
-
-                    // Загружаем персонажа
-                    if (data.character) {
-                        currentCharacter = data.character;
-                        showCharacterInfo('Загруженный персонаж', data.character);
-                    }
-
-                    // Показываем игровую область
-                    document.getElementById('start-screen').style.display = 'none';
-                    document.getElementById('game-area').style.display = 'flex';
-                }
-            })
-            .catch(error => {
-                alert('Ошибка загрузки: ' + error.message);
-            });
-        }
+        
 
         function uploadCharacter() {
             const fileInput = document.getElementById('characterFile');
             const file = fileInput.files[0];
 
             if (!file) {
-                alert('Пожалуйста, выберите файл персонажа');
+                showNotification('Пожалуйста, выберите файл персонажа', 'error');
                 return;
             }
 
@@ -851,26 +1062,26 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert('❌ ' + data.error);
+                    showNotification(data.error, 'error');
                 } else {
-                    alert('✅ ' + data.message);
+                    showNotification(data.message, 'success');
                     currentCharacter = data.character;
-                    showCharacterInfo('Загруженный персонаж', data.character);
                     fileInput.value = '';
                     loadCharacters(); // Обновляем список персонажей
+                    
+                    // Автоматически начинаем игру
+                    hideStartScreen();
+                    introduceCharacterToAI();
                 }
             })
             .catch(error => {
-                alert('Ошибка загрузки персонажа: ' + error.message);
+                showNotification('Ошибка загрузки персонажа: ' + error.message, 'error');
             });
         }
 
         function createCharacter() {
             // Переходим в режим создания персонажа
-            if (document.getElementById('game-area').style.display === 'none') {
-                document.getElementById('start-screen').style.display = 'none';
-                document.getElementById('game-area').style.display = 'flex';
-            }
+            hideStartScreen();
 
             // Отправляем запрос на создание персонажа
             const messageInput = document.getElementById('messageInput');
