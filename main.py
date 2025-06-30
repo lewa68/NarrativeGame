@@ -188,8 +188,12 @@ def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
             timeout=30
         )
         
-        if response.status_code != 200:
-            return f"Ошибка API: {response.status_code}"
+        if response.status_code == 402:
+            return "💳 **Ошибка оплаты**: На вашем аккаунте OpenRouter закончились средства или достигнут лимит. Пожалуйста, пополните баланс на https://openrouter.ai/"
+        elif response.status_code == 401:
+            return "🔑 **Ошибка авторизации**: Проверьте правильность API ключа OpenRouter"
+        elif response.status_code != 200:
+            return f"⚠️ **Ошибка API**: {response.status_code} - {response.text}"
 
         result = response.json()
         content = result["choices"][0]["message"]["content"]
