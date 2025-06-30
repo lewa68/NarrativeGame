@@ -102,7 +102,11 @@ def create_gm_system_prompt(rules):
     return system_prompt
 
 def process_content(content):
-    return content.replace('<think>', '').replace('</think>', '')
+    # Более аккуратная обработка тегов мышления
+    import re
+    # Удаляем содержимое между тегами <think>...</think> но сохраняем остальной текст
+    cleaned = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+    return cleaned.strip()
 
 def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
     headers = {
@@ -140,7 +144,13 @@ def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
 
         result = response.json()
         content = result["choices"][0]["message"]["content"]
-        return process_content(content)
+        processed_content = process_content(content)
+        
+        # Логирование для отладки
+        print(f"[DEBUG] Исходное сообщение длина: {len(content)}")
+        print(f"[DEBUG] Обработанное сообщение длина: {len(processed_content)}")
+        
+        return processed_content
     
     except Exception as e:
         return f"Ошибка: {str(e)}"
@@ -163,7 +173,7 @@ def start_game():
     
     response = chat_with_ai("Начни игру с предложения выбрать сеттинг", system_prompt, [])
     
-    if response:
+    if response and response.strip():
         session['conversation_history'] = [
             {"role": "user", "content": "Начни игру"},
             {"role": "assistant", "content": response}
@@ -184,7 +194,7 @@ def send_message():
     
     response = chat_with_ai(user_message, system_prompt, conversation_history)
     
-    if response:
+    if response and response.strip():
         conversation_history.extend([
             {"role": "user", "content": user_message},
             {"role": "assistant", "content": response}
