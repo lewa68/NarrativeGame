@@ -319,6 +319,7 @@
                 <input type="file" id="characterFile" accept=".json,.txt" style="margin-bottom: 10px;">
                 <button class="action-btn" onclick="uploadCharacter()">📤 Загрузить файл</button>
                 <button class="action-btn" onclick="createCharacter()">✨ Создать нового</button>
+                <button class="action-btn" onclick="introduceCharacterToAI()" id="introduce-btn" style="display: none;">🤖 Представить персонажа ИИ</button>
             </div>
 
             <!-- Сохранения -->
@@ -477,6 +478,54 @@
                 <strong>👤 Текущий персонаж: ${name}</strong><br>
                 <small>${description.substring(0, 100)}${description.length > 100 ? '...' : ''}</small>
             `;
+            
+            // Показываем кнопку представления персонажа ИИ
+            document.getElementById('introduce-btn').style.display = 'block';
+        }
+
+        function introduceCharacterToAI() {
+            if (!currentCharacter) {
+                alert('Сначала выберите или создайте персонажа');
+                return;
+            }
+            
+            // Переходим в игровую область если еще не там
+            if (document.getElementById('game-area').style.display === 'none') {
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('game-area').style.display = 'flex';
+            }
+            
+            // Отправляем полное описание персонажа ИИ
+            addMessage('player', '🤖 Представляю своего персонажа ИИ');
+            
+            showLoading();
+            
+            fetch('/send_message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: `ГМ: Изучи моего персонажа детально и запомни всю информацию о нем:\n\n${currentCharacter}\n\nТеперь ты знаешь моего персонажа. Подтверди, что ты изучил и запомнил всю информацию о нем.`
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    if (data.need_login) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    showError(data.error);
+                } else {
+                    addMessage('gm', data.response);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showError('Ошибка соединения: ' + error.message);
+            });
         }
 
         function startGame() {
