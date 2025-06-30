@@ -100,24 +100,43 @@ def chat_stream(prompt, system_prompt="", conversation_history=[]):
 
         print()  # Перенос строки после завершения потока
         return ''.join(full_response)
+def print_separator():
+    """Печатает визуальный разделитель"""
+    print("\n" + "="*80 + "\n")
+
+def print_gm_header():
+    """Печатает заголовок сообщения ГМ"""
+    print("🎲 ГЕЙМ МАСТЕР:")
+    print("-" * 40)
+
+def print_player_prompt():
+    """Печатает красивое приглашение для игрока"""
+    print("\n" + "🎮 ВАШ ХОД:")
+    print("-" * 20)
+    return input(">>> ")
+
 def main():
     if not API_KEY:
-        print("Ошибка: API ключ не найден. Добавьте OPENROUTER_API_KEY в Secrets.")
+        print("❌ Ошибка: API ключ не найден. Добавьте OPENROUTER_API_KEY в Secrets.")
         return
         
     # Загружаем правила ГМ
     rules = load_gm_rules()
     system_prompt = create_gm_system_prompt(rules)
     
-    print("=== НАРРАТИВНАЯ РОЛЕВАЯ ИГРА ===")
-    print("ГМ: DeepSeek-R1 (специализированная версия для RPG)")
-    print("Для выхода введите 'exit'")
-    print("Используйте тег 'ГМ:' если хотите получить варианты действий\n")
+    print("╔" + "="*78 + "╗")
+    print("║" + " "*25 + "НАРРАТИВНАЯ РОЛЕВАЯ ИГРА" + " "*25 + "║")
+    print("║" + " "*78 + "║")
+    print("║  🤖 ГМ: DeepSeek-R1 (специализированная версия для RPG)" + " "*14 + "║")
+    print("║  📝 Для выхода введите 'exit'" + " "*41 + "║")
+    print("║  🔧 Используйте тег 'ГМ:' для получения вариантов действий" + " "*9 + "║")
+    print("╚" + "="*78 + "╝")
     
     conversation_history = []
     
     # Первое сообщение от ГМ
-    print("ГМ:", end=' ', flush=True)
+    print_separator()
+    print_gm_header()
     first_response = chat_stream("Начни игру", system_prompt, conversation_history)
     if first_response:
         conversation_history.extend([
@@ -126,13 +145,15 @@ def main():
         ])
 
     while True:
-        user_input = input("\nВы: ")
+        user_input = print_player_prompt()
 
         if user_input.lower() == 'exit':
-            print("Завершение работы...")
+            print("\n" + "🚪 Завершение работы...")
+            print("Спасибо за игру! 🎲")
             break
 
-        print("ГМ:", end=' ', flush=True)
+        print_separator()
+        print_gm_header()
         response = chat_stream(user_input, system_prompt, conversation_history)
         
         if response:
