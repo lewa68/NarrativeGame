@@ -520,6 +520,15 @@
                     showError(data.error);
                 } else {
                     addMessage('gm', data.response);
+                    
+                    // Проверяем, был ли персонаж успешно представлен
+                    if (data.character_introduced) {
+                        // Автоматически начинаем игру через 2 секунды
+                        setTimeout(() => {
+                            addMessage('player', '🎮 Начинаю приключение!');
+                            startActualGame();
+                        }, 2000);
+                    }
                 }
             })
             .catch(error => {
@@ -535,6 +544,34 @@
             showLoading();
             
             fetch('/start_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    if (data.need_login) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    showError(data.error);
+                } else {
+                    addMessage('gm', data.response);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showError('Ошибка соединения: ' + error.message);
+            });
+        }
+
+        function startActualGame() {
+            showLoading();
+            
+            fetch('/start_actual_game', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

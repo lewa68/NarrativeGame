@@ -389,9 +389,49 @@ def introduce_character():
     
     response = chat_with_ai(introduce_message, system_prompt, conversation_history)
     
+    # Проверяем, был ли персонаж успешно представлен
+    character_introduced = False
     if response and response.strip():
+        # Ключевые слова, указывающие на успешное представление
+        success_keywords = [
+            "изучил", "запомнил", "понял", "знаю", "готов", 
+            "приступим", "начинаем", "понятно", "ясно",
+            "информация получена", "данные сохранены"
+        ]
+        
+        response_lower = response.lower()
+        character_introduced = any(keyword in response_lower for keyword in success_keywords)
+        
         conversation_history.extend([
             {"role": "user", "content": "🤖 Представляю своего персонажа ИИ"},
+            {"role": "assistant", "content": response}
+        ])
+        session['conversation_history'] = conversation_history
+    
+    return jsonify({
+        "response": response,
+        "character_introduced": character_introduced
+    })
+
+@app.route('/start_actual_game', methods=['POST'])
+@login_required
+def start_actual_game():
+    """Начинает настоящую игру после представления персонажа"""
+    if not session.get('character'):
+        return jsonify({"error": "Персонаж не найден"})
+    
+    conversation_history = session.get('conversation_history', [])
+    system_prompt = session.get('system_prompt', '')
+    character_info = session['character']
+    
+    # Специальное сообщение для начала игры с известным персонажем
+    start_message = f"ГМ: Теперь, когда ты знаешь моего персонажа, начни для него захватывающее приключение! Создай начальную сцену и ситуацию."
+    
+    response = chat_with_ai(start_message, system_prompt, conversation_history)
+    
+    if response and response.strip():
+        conversation_history.extend([
+            {"role": "user", "content": "🎮 Начинаю приключение!"},
             {"role": "assistant", "content": response}
         ])
         session['conversation_history'] = conversation_history
