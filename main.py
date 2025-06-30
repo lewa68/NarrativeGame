@@ -104,9 +104,19 @@ def create_gm_system_prompt(rules):
 def process_content(content):
     # Более аккуратная обработка тегов мышления
     import re
-    # Удаляем содержимое между тегами <think>...</think> но сохраняем остальной текст
-    cleaned = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
-    return cleaned.strip()
+    # Удаляем только содержимое между тегами <think>...</think>, сохраняя остальной текст
+    cleaned = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL | re.IGNORECASE)
+    # Также удаляем пустые строки и лишние пробелы
+    cleaned = re.sub(r'\n\s*\n', '\n', cleaned)
+    cleaned = cleaned.strip()
+    
+    # Логирование для отладки
+    if len(content) > len(cleaned) + 100:  # Если удалили много текста
+        print(f"[DEBUG] ВНИМАНИЕ: Удален большой блок текста!")
+        print(f"[DEBUG] Исходный текст начало: {content[:200]}...")
+        print(f"[DEBUG] Обработанный текст: {cleaned[:200]}...")
+    
+    return cleaned
 
 def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
     headers = {
@@ -149,6 +159,11 @@ def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
         # Логирование для отладки
         print(f"[DEBUG] Исходное сообщение длина: {len(content)}")
         print(f"[DEBUG] Обработанное сообщение длина: {len(processed_content)}")
+        
+        # Если после обработки контент стал пустым или очень коротким, возвращаем исходный
+        if not processed_content or len(processed_content) < 10:
+            print(f"[DEBUG] ВНИМАНИЕ: Обработанный контент слишком короткий, возвращаем исходный")
+            return content
         
         return processed_content
     
