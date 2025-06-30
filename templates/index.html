@@ -1,0 +1,411 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎲 Нарративная RPG</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .header p {
+            opacity: 0.8;
+            font-size: 1.1em;
+        }
+
+        .game-container {
+            flex: 1;
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .chat-area {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            max-height: 500px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .gm-message {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            border-left: 4px solid #fff;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.3);
+        }
+
+        .player-message {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            border-left: 4px solid #fff;
+            margin-left: 50px;
+            box-shadow: 0 4px 15px rgba(78,205,196,0.3);
+        }
+
+        .message-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .message-input:focus {
+            box-shadow: 0 0 15px rgba(255,255,255,0.5);
+        }
+
+        .send-btn, .action-btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .send-btn:hover, .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .controls {
+            width: 300px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .controls h3 {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #ffd700;
+            font-style: italic;
+        }
+
+        .error {
+            background: linear-gradient(135deg, #ff4757, #ff3838);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .start-screen {
+            text-align: center;
+            padding: 50px 20px;
+        }
+
+        .start-btn {
+            padding: 20px 40px;
+            font-size: 1.2em;
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(17,153,142,0.4);
+        }
+
+        @media (max-width: 768px) {
+            .game-container {
+                flex-direction: column;
+            }
+            
+            .controls {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎲 Нарративная Ролевая Игра</h1>
+        <p>Powered by DeepSeek-R1 | Умная система контекста</p>
+    </div>
+
+    <div class="game-container">
+        <div class="chat-area">
+            <div id="start-screen" class="start-screen">
+                <h2>Добро пожаловать в мир бесконечных возможностей!</h2>
+                <p style="margin: 20px 0;">Нажмите кнопку ниже, чтобы начать игру</p>
+                <button class="start-btn" onclick="startGame()">🚀 Начать игру</button>
+            </div>
+
+            <div id="game-area" style="display: none; height: 100%; display: flex; flex-direction: column;">
+                <div class="messages" id="messages"></div>
+                
+                <div class="input-area">
+                    <input type="text" id="messageInput" class="message-input" 
+                           placeholder="Введите ваше действие... (добавьте 'ГМ:' для получения вариантов)"
+                           onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" onclick="sendMessage()">📤 Отправить</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <h3>🎮 Управление</h3>
+            
+            <div class="control-group">
+                <button class="action-btn" onclick="saveGame()" style="width: 100%; margin-bottom: 10px;">
+                    💾 Сохранить игру
+                </button>
+                <button class="action-btn" onclick="loadGame()" style="width: 100%; margin-bottom: 10px;">
+                    📁 Загрузить игру
+                </button>
+            </div>
+
+            <div class="control-group">
+                <h4>💡 Подсказки:</h4>
+                <ul style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">
+                    <li>Добавьте "ГМ:" для получения вариантов действий</li>
+                    <li>Игра автоматически оптимизирует контекст</li>
+                    <li>Все действия сохраняются в сессии</li>
+                </ul>
+            </div>
+
+            <div class="control-group">
+                <small style="opacity: 0.6;">
+                    Система умного контекста активна<br>
+                    Токены оптимизированы автоматически
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-area').style.display = 'flex';
+            
+            showLoading();
+            
+            fetch('/start_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    addMessage('gm', data.response);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showError('Ошибка соединения: ' + error.message);
+            });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            addMessage('player', message);
+            input.value = '';
+            
+            showLoading();
+            
+            fetch('/send_message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({message: message})
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    addMessage('gm', data.response);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showError('Ошибка соединения: ' + error.message);
+            });
+        }
+
+        function addMessage(type, content) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            
+            const header = type === 'gm' ? '🎲 Гейм Мастер' : '🎮 Игрок';
+            messageDiv.innerHTML = `
+                <div class="message-header">${header}</div>
+                <div>${content.replace(/\n/g, '<br>')}</div>
+            `;
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function showLoading() {
+            const messages = document.getElementById('messages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading';
+            loadingDiv.className = 'loading';
+            loadingDiv.innerHTML = '🤔 ГМ размышляет...';
+            messages.appendChild(loadingDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function hideLoading() {
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.remove();
+            }
+        }
+
+        function showError(message) {
+            const messages = document.getElementById('messages');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `❌ ${message}`;
+            messages.appendChild(errorDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function saveGame() {
+            fetch('/save_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Ошибка сохранения: ' + data.error);
+                } else {
+                    alert('✅ ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Ошибка сохранения: ' + error.message);
+            });
+        }
+
+        function loadGame() {
+            fetch('/load_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Ошибка загрузки: ' + data.error);
+                } else {
+                    alert('✅ ' + data.message);
+                    location.reload(); // Перезагружаем страницу для отображения загруженной игры
+                }
+            })
+            .catch(error => {
+                alert('Ошибка загрузки: ' + error.message);
+            });
+        }
+    </script>
+</body>
+</html>

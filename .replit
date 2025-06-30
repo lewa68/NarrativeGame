@@ -15,10 +15,19 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Start RPG Game Master"
+runButton = "Start Web RPG"
 
 [[workflows.workflow]]
-name = "Start RPG Game Master"
+name = "Start Web RPG"
+author = 42903682
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py web"
+
+[[workflows.workflow]]
+name = "Start Console RPG"
 author = 42903682
 mode = "sequential"
 
