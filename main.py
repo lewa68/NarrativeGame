@@ -1,4 +1,5 @@
-
+import pip
+pip.main(['install', 'flask'])
 import requests
 import json
 import os
