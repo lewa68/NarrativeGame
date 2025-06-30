@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -15,9 +16,10 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: #fff;
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .header {
@@ -27,6 +29,7 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid rgba(255,255,255,0.1);
+            flex-shrink: 0;
         }
 
         .header h1 {
@@ -58,44 +61,105 @@
             transform: translateY(-1px);
         }
 
-        .game-container {
+        .main-container {
             flex: 1;
             display: flex;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            gap: 20px;
+            overflow: hidden;
         }
 
         .sidebar {
             width: 320px;
             background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 20px;
             backdrop-filter: blur(10px);
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            background: rgba(0,0,0,0.2);
+            margin: 10px;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .sidebar-section h3 {
+            margin-bottom: 15px;
+            text-align: center;
+            color: #ffd700;
+        }
+
+        .chats-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-tabs {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            display: flex;
+            gap: 5px;
+            overflow-x: auto;
+            flex-shrink: 0;
+        }
+
+        .chat-tab {
+            padding: 8px 15px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .chat-tab.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .chat-tab:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .chat-tab.active:hover {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .chat-tab .close-btn {
+            margin-left: 8px;
+            color: #ff4757;
+            font-weight: bold;
+        }
+
+        .new-chat-btn {
+            padding: 8px 15px;
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
         }
 
         .chat-area {
             flex: 1;
             background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 20px;
             backdrop-filter: blur(10px);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .messages {
             flex: 1;
             overflow-y: auto;
-            margin-bottom: 20px;
-            max-height: 500px;
-            padding: 10px;
+            padding: 20px;
             background: rgba(0,0,0,0.2);
-            border-radius: 10px;
         }
 
         .message {
@@ -104,6 +168,7 @@
             border-radius: 10px;
             word-wrap: break-word;
             animation: slideIn 0.3s ease-out;
+            position: relative;
         }
 
         @keyframes slideIn {
@@ -112,13 +177,11 @@
         }
 
         .gm-message {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
             border-left: 4px solid #fff;
             box-shadow: 0 4px 15px rgba(255,107,107,0.3);
         }
 
         .player-message {
-            background: linear-gradient(135deg, #4ecdc4, #44a08d);
             border-left: 4px solid #fff;
             margin-left: 50px;
             box-shadow: 0 4px 15px rgba(78,205,196,0.3);
@@ -132,9 +195,42 @@
             gap: 8px;
         }
 
+        .message-content {
+            line-height: 1.6;
+        }
+
+        .message-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .message:hover .message-actions {
+            opacity: 1;
+        }
+
+        .edit-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 15px;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .edit-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
         .input-area {
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
             display: flex;
             gap: 10px;
+            flex-shrink: 0;
         }
 
         .message-input {
@@ -146,6 +242,9 @@
             color: #333;
             font-size: 16px;
             outline: none;
+            resize: vertical;
+            min-height: 50px;
+            max-height: 150px;
         }
 
         .message-input:focus {
@@ -169,18 +268,6 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
-        .sidebar-section {
-            background: rgba(0,0,0,0.2);
-            padding: 15px;
-            border-radius: 10px;
-        }
-
-        .sidebar-section h3 {
-            margin-bottom: 15px;
-            text-align: center;
-            color: #ffd700;
-        }
-
         .character-info {
             background: rgba(255,215,0,0.2);
             padding: 10px;
@@ -198,11 +285,23 @@
             cursor: pointer;
             transition: all 0.3s;
             border-left: 3px solid transparent;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .list-item:hover {
             background: rgba(255,255,255,0.2);
             border-left-color: #ffd700;
+        }
+
+        .list-item.selected {
+            background: rgba(255,215,0,0.3);
+            border-left-color: #ffd700;
+        }
+
+        .list-item-content {
+            flex: 1;
         }
 
         .list-item h4 {
@@ -230,6 +329,11 @@
         }
 
         .start-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
             text-align: center;
             padding: 50px 20px;
         }
@@ -345,53 +449,118 @@
             transform: scale(1.1);
         }
 
-        .list-item {
-            background: rgba(255,255,255,0.1);
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 8px;
+        .settings-panel {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px;
+        }
+
+        .settings-panel h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .setting-item {
+            margin-bottom: 15px;
+        }
+
+        .setting-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .setting-item input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .setting-item input[type="color"] {
+            width: 100%;
+            height: 30px;
+            border: none;
+            border-radius: 5px;
             cursor: pointer;
-            transition: all 0.3s;
-            border-left: 3px solid transparent;
+        }
+
+        .color-preview {
+            width: 100%;
+            height: 20px;
+            border-radius: 5px;
+            margin-top: 5px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
 
-        .list-item:hover {
-            background: rgba(255,255,255,0.2);
-            border-left-color: #ffd700;
+        .edit-mode {
+            background: rgba(255,255,0,0.1) !important;
+            border: 2px solid #ffd700 !important;
         }
 
-        .list-item.selected {
-            background: rgba(255,215,0,0.3);
-            border-left-color: #ffd700;
+        .edit-input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 80px;
         }
 
-        .list-item-content {
-            flex: 1;
+        .edit-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .save-edit-btn, .cancel-edit-btn {
+            padding: 5px 15px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .save-edit-btn {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
+        }
+
+        .cancel-edit-btn {
+            background: linear-gradient(135deg, #ff4757, #ff3838);
+            color: white;
         }
 
         @media (max-width: 1200px) {
-            .game-container {
+            .main-container {
                 flex-direction: column;
             }
 
             .sidebar {
                 width: 100%;
+                height: 200px;
                 flex-direction: row;
-                flex-wrap: wrap;
+                overflow-x: auto;
             }
 
             .sidebar-section {
-                flex: 1;
                 min-width: 250px;
+                flex-shrink: 0;
             }
         }
 
         @media (max-width: 768px) {
             .sidebar {
                 flex-direction: column;
+                height: auto;
             }
         }
     </style>
@@ -405,8 +574,15 @@
         </div>
     </div>
 
-    <div class="game-container">
+    <div class="main-container">
         <div class="sidebar">
+            <!-- Чаты -->
+            <div class="sidebar-section">
+                <h3>💬 Чаты</h3>
+                <div id="chats-list"></div>
+                <button class="action-btn" onclick="createNewChat()">➕ Новый чат</button>
+            </div>
+
             <!-- Персонажи -->
             <div class="sidebar-section">
                 <h3>👤 Персонажи</h3>
@@ -427,23 +603,53 @@
                 <input type="text" id="save-name-input" class="small-input" placeholder="Название сохранения">
                 <button class="action-btn" onclick="saveGame()">💾 Сохранить</button>
             </div>
+
+            <!-- Настройки -->
+            <div class="settings-panel">
+                <h3>⚙️ Настройки</h3>
+                
+                <div class="setting-item">
+                    <label>Размер текста:</label>
+                    <input type="range" id="fontSizeSlider" min="12" max="20" value="14" onchange="updateFontSize()">
+                    <span id="fontSizeValue">14px</span>
+                </div>
+
+                <div class="setting-item">
+                    <label>Фон сообщений ГМ:</label>
+                    <input type="color" id="gmColorPicker" value="#ff6b6b" onchange="updateGMColor()">
+                    <div class="color-preview" id="gmColorPreview">Гейм Мастер</div>
+                </div>
+
+                <div class="setting-item">
+                    <label>Фон сообщений игрока:</label>
+                    <input type="color" id="playerColorPicker" value="#4ecdc4" onchange="updatePlayerColor()">
+                    <div class="color-preview" id="playerColorPreview">Игрок</div>
+                </div>
+            </div>
         </div>
 
-        <div class="chat-area">
-            <div id="start-screen" class="start-screen">
-                <h2>Добро пожаловать в мир бесконечных возможностей!</h2>
-                <p style="margin: 20px 0;">Выберите или создайте персонажа, затем нажмите кнопку для начала игры</p>
-                <button class="start-btn" onclick="startGame()">🚀 Начать игру</button>
+        <div class="chats-container">
+            <div class="chat-tabs" id="chat-tabs">
+                <button class="chat-tab active" data-chat-id="default">Основной чат</button>
+                <button class="new-chat-btn" onclick="createNewChat()">+</button>
             </div>
 
-            <div id="game-area" style="display: none; height: 100%; display: flex; flex-direction: column;">
-                <div class="messages" id="messages"></div>
+            <div class="chat-area">
+                <div id="start-screen" class="start-screen">
+                    <h2>Добро пожаловать в мир бесконечных возможностей!</h2>
+                    <p style="margin: 20px 0;">Выберите или создайте персонажа, затем нажмите кнопку для начала игры</p>
+                    <button class="start-btn" onclick="startGame()">🚀 Начать игру</button>
+                </div>
 
-                <div class="input-area">
-                    <input type="text" id="messageInput" class="message-input" 
-                           placeholder="Введите ваше действие... (добавьте 'ГМ:' для получения вариантов)"
-                           onkeypress="handleKeyPress(event)">
-                    <button class="send-btn" onclick="sendMessage()">📤 Отправить</button>
+                <div id="game-area" style="display: none;">
+                    <div class="messages" id="messages"></div>
+
+                    <div class="input-area">
+                        <textarea id="messageInput" class="message-input" 
+                               placeholder="Введите ваше действие... (добавьте 'ГМ:' для получения вариантов)"
+                               onkeypress="handleKeyPress(event)"></textarea>
+                        <button class="send-btn" onclick="sendMessage()">📤 Отправить</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -454,17 +660,71 @@
 
     <script>
         let currentCharacter = null;
+        let currentCharacterName = null;
         let userInfo = null;
         let selectedCharacterFile = null;
         let selectedSaveFile = null;
         let gameStarted = false;
+        let currentChatId = 'default';
+        let chats = {};
+        let editingMessageId = null;
 
         // Загружаем информацию о пользователе при загрузке страницы
         window.onload = function() {
             loadUserInfo();
             loadCharacters();
             loadSaves();
+            loadChats();
+            loadSettings();
         };
+
+        function loadSettings() {
+            const fontSize = localStorage.getItem('fontSize') || '14';
+            const gmColor = localStorage.getItem('gmColor') || '#ff6b6b';
+            const playerColor = localStorage.getItem('playerColor') || '#4ecdc4';
+
+            document.getElementById('fontSizeSlider').value = fontSize;
+            document.getElementById('gmColorPicker').value = gmColor;
+            document.getElementById('playerColorPicker').value = playerColor;
+
+            updateFontSize();
+            updateGMColor();
+            updatePlayerColor();
+        }
+
+        function updateFontSize() {
+            const fontSize = document.getElementById('fontSizeSlider').value;
+            document.getElementById('fontSizeValue').textContent = fontSize + 'px';
+            document.documentElement.style.setProperty('--message-font-size', fontSize + 'px');
+            localStorage.setItem('fontSize', fontSize);
+            
+            // Применяем к сообщениям
+            document.querySelectorAll('.message-content').forEach(el => {
+                el.style.fontSize = fontSize + 'px';
+            });
+        }
+
+        function updateGMColor() {
+            const color = document.getElementById('gmColorPicker').value;
+            document.getElementById('gmColorPreview').style.background = `linear-gradient(135deg, ${color}, ${color}dd)`;
+            localStorage.setItem('gmColor', color);
+            
+            // Применяем к сообщениям ГМ
+            document.querySelectorAll('.gm-message').forEach(el => {
+                el.style.background = `linear-gradient(135deg, ${color}, ${color}dd)`;
+            });
+        }
+
+        function updatePlayerColor() {
+            const color = document.getElementById('playerColorPicker').value;
+            document.getElementById('playerColorPreview').style.background = `linear-gradient(135deg, ${color}, ${color}dd)`;
+            localStorage.setItem('playerColor', color);
+            
+            // Применяем к сообщениям игрока
+            document.querySelectorAll('.player-message').forEach(el => {
+                el.style.background = `linear-gradient(135deg, ${color}, ${color}dd)`;
+            });
+        }
 
         function showNotification(message, type = 'success') {
             const container = document.getElementById('notification-container');
@@ -474,12 +734,10 @@
             
             container.appendChild(notification);
             
-            // Показываем уведомление
             setTimeout(() => {
                 notification.classList.add('show');
             }, 100);
             
-            // Убираем уведомление через 3 секунды
             setTimeout(() => {
                 notification.classList.remove('show');
                 setTimeout(() => {
@@ -499,10 +757,6 @@
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Сервер вернул не JSON ответ');
                 }
                 return response.json();
             })
@@ -528,18 +782,155 @@
             });
         }
 
+        function loadChats() {
+            fetch('/get_chats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.chats) {
+                    chats = data.chats;
+                    updateChatTabs();
+                    if (Object.keys(chats).length > 0) {
+                        switchToChat(Object.keys(chats)[0]);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка загрузки чатов:', error);
+            });
+        }
+
+        function updateChatTabs() {
+            const tabsContainer = document.getElementById('chat-tabs');
+            tabsContainer.innerHTML = '';
+
+            Object.keys(chats).forEach(chatId => {
+                const tab = document.createElement('button');
+                tab.className = 'chat-tab';
+                tab.dataset.chatId = chatId;
+                tab.innerHTML = `${chats[chatId].name} <span class="close-btn" onclick="deleteChat('${chatId}', event)">×</span>`;
+                tab.onclick = (e) => {
+                    if (!e.target.classList.contains('close-btn')) {
+                        switchToChat(chatId);
+                    }
+                };
+                tabsContainer.appendChild(tab);
+            });
+
+            const newChatBtn = document.createElement('button');
+            newChatBtn.className = 'new-chat-btn';
+            newChatBtn.textContent = '+';
+            newChatBtn.onclick = createNewChat;
+            tabsContainer.appendChild(newChatBtn);
+        }
+
+        function switchToChat(chatId) {
+            currentChatId = chatId;
+            
+            // Обновляем активную вкладку
+            document.querySelectorAll('.chat-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.chatId === chatId) {
+                    tab.classList.add('active');
+                }
+            });
+
+            // Загружаем сообщения чата
+            const messages = document.getElementById('messages');
+            messages.innerHTML = '';
+
+            if (chats[chatId] && chats[chatId].messages) {
+                chats[chatId].messages.forEach((msg, index) => {
+                    if (msg.role === 'user') {
+                        addMessage('player', msg.content, index);
+                    } else if (msg.role === 'assistant') {
+                        addMessage('gm', msg.content, index);
+                    }
+                });
+            }
+
+            // Загружаем персонажа чата
+            if (chats[chatId] && chats[chatId].character) {
+                currentCharacter = chats[chatId].character;
+                currentCharacterName = chats[chatId].character_name || 'Игрок';
+            }
+        }
+
+        function createNewChat() {
+            const chatName = prompt('Название нового чата:') || `Чат ${Object.keys(chats).length + 1}`;
+            const chatId = Date.now().toString();
+            
+            chats[chatId] = {
+                name: chatName,
+                messages: [],
+                character: null,
+                character_name: null,
+                created_at: new Date().toISOString()
+            };
+
+            saveChatData(chatId);
+            updateChatTabs();
+            switchToChat(chatId);
+        }
+
+        function deleteChat(chatId, event) {
+            event.stopPropagation();
+            
+            if (Object.keys(chats).length <= 1) {
+                showNotification('Нельзя удалить последний чат', 'error');
+                return;
+            }
+
+            fetch('/delete_chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({chat_id: chatId})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    delete chats[chatId];
+                    
+                    if (currentChatId === chatId) {
+                        const remainingChats = Object.keys(chats);
+                        if (remainingChats.length > 0) {
+                            switchToChat(remainingChats[0]);
+                        }
+                    }
+                    
+                    updateChatTabs();
+                    showNotification('Чат удален', 'success');
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Ошибка удаления чата: ' + error.message, 'error');
+            });
+        }
+
+        function saveChatData(chatId = currentChatId) {
+            if (!chats[chatId]) return;
+
+            fetch('/save_chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    chat_data: chats[chatId]
+                })
+            })
+            .catch(error => {
+                console.error('Ошибка сохранения чата:', error);
+            });
+        }
+
         function loadCharacters() {
             fetch('/get_characters')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Сервер вернул не JSON ответ');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 const list = document.getElementById('characters-list');
                 list.innerHTML = '';
@@ -573,16 +964,7 @@
 
         function loadSaves() {
             fetch('/get_saves')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Сервер вернул не JSON ответ');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 const list = document.getElementById('saves-list');
                 list.innerHTML = '';
@@ -616,7 +998,6 @@
         }
 
         function selectCharacter(filename, name, element) {
-            // Убираем выделение с других элементов
             document.querySelectorAll('#characters-list .list-item').forEach(item => {
                 item.classList.remove('selected');
             });
@@ -624,7 +1005,6 @@
                 item.classList.remove('selected');
             });
             
-            // Выделяем выбранный элемент
             element.classList.add('selected');
             
             selectedCharacterFile = filename;
@@ -635,7 +1015,6 @@
         }
 
         function selectSave(filename, element) {
-            // Убираем выделение с других элементов
             document.querySelectorAll('#characters-list .list-item').forEach(item => {
                 item.classList.remove('selected');
             });
@@ -643,7 +1022,6 @@
                 item.classList.remove('selected');
             });
             
-            // Выделяем выбранный элемент
             element.classList.add('selected');
             
             selectedSaveFile = filename;
@@ -656,53 +1034,49 @@
         function deleteCharacter(filename, event) {
             event.stopPropagation();
             
-            if (confirm('Вы уверены, что хотите удалить этого персонажа?')) {
-                fetch('/delete_character', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({filename: filename})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification('Персонаж удален', 'success');
-                        loadCharacters();
-                    } else {
-                        showNotification(data.error, 'error');
-                    }
-                })
-                .catch(error => {
-                    showNotification('Ошибка удаления: ' + error.message, 'error');
-                });
-            }
+            fetch('/delete_character', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({filename: filename})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Персонаж удален', 'success');
+                    loadCharacters();
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Ошибка удаления: ' + error.message, 'error');
+            });
         }
 
         function deleteSave(filename, event) {
             event.stopPropagation();
             
-            if (confirm('Вы уверены, что хотите удалить это сохранение?')) {
-                fetch('/delete_save', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({filename: filename})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification('Сохранение удалено', 'success');
-                        loadSaves();
-                    } else {
-                        showNotification(data.error, 'error');
-                    }
-                })
-                .catch(error => {
-                    showNotification('Ошибка удаления: ' + error.message, 'error');
-                });
-            }
+            fetch('/delete_save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({filename: filename})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Сохранение удалено', 'success');
+                    loadSaves();
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Ошибка удаления: ' + error.message, 'error');
+            });
         }
 
         function startSelectedGame() {
@@ -728,8 +1102,21 @@
             .then(data => {
                 if (data.success) {
                     currentCharacter = data.character;
+                    currentCharacterName = data.name || 'Персонаж';
+                    
+                    // Сохраняем персонажа в текущий чат
+                    if (!chats[currentChatId]) {
+                        chats[currentChatId] = {
+                            name: 'Основной чат',
+                            messages: [],
+                            character: null,
+                            character_name: null
+                        };
+                    }
+                    chats[currentChatId].character = currentCharacter;
+                    chats[currentChatId].character_name = currentCharacterName;
+                    
                     showNotification('Персонаж загружен, начинаем игру!', 'success');
-                    // Автоматически представляем персонажа и начинаем игру
                     introduceCharacterToAI();
                 } else {
                     showNotification(data.error, 'error');
@@ -756,23 +1143,36 @@
                 if (data.success) {
                     showNotification('Игра загружена!', 'success');
 
-                    // Загружаем историю сообщений
                     const messages = document.getElementById('messages');
                     messages.innerHTML = '';
 
                     if (data.history && data.history.length > 0) {
-                        data.history.forEach(msg => {
+                        data.history.forEach((msg, index) => {
                             if (msg.role === 'user') {
-                                addMessage('player', msg.content);
+                                addMessage('player', msg.content, index);
                             } else if (msg.role === 'assistant') {
-                                addMessage('gm', msg.content);
+                                addMessage('gm', msg.content, index);
                             }
                         });
                     }
 
-                    // Загружаем персонажа
                     if (data.character) {
                         currentCharacter = data.character;
+                        currentCharacterName = data.character_name || 'Персонаж';
+                        
+                        // Обновляем текущий чат
+                        if (!chats[currentChatId]) {
+                            chats[currentChatId] = {
+                                name: 'Основной чат',
+                                messages: [],
+                                character: null,
+                                character_name: null
+                            };
+                        }
+                        chats[currentChatId].character = currentCharacter;
+                        chats[currentChatId].character_name = currentCharacterName;
+                        chats[currentChatId].messages = data.history || [];
+                        saveChatData();
                     }
                 } else {
                     showNotification(data.error, 'error');
@@ -789,7 +1189,6 @@
                 return;
             }
 
-            // Отправляем полное описание персонажа ИИ
             addMessage('player', '🤖 Представляю своего персонажа ИИ');
 
             showLoading();
@@ -800,19 +1199,11 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    character: currentCharacter
+                    character: currentCharacter,
+                    chat_id: currentChatId
                 })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Сервер вернул не JSON ответ');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 hideLoading();
                 if (data.error) {
@@ -824,9 +1215,7 @@
                 } else {
                     addMessage('gm', data.response);
 
-                    // Проверяем, был ли персонаж успешно представлен
                     if (data.character_introduced) {
-                        // Автоматически начинаем игру через 2 секунды
                         setTimeout(() => {
                             addMessage('player', '🎮 Начинаю приключение!');
                             startActualGame();
@@ -849,18 +1238,12 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
+                body: JSON.stringify({
+                    chat_id: currentChatId
+                })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Сервер вернул не JSON ответ');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 hideLoading();
                 if (data.error) {
@@ -886,18 +1269,12 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
+                body: JSON.stringify({
+                    chat_id: currentChatId
+                })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Сервер вернул не JSON ответ');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 hideLoading();
                 if (data.error) {
@@ -922,6 +1299,7 @@
 
             if (!message) return;
 
+            const playerName = currentCharacterName || 'Игрок';
             addMessage('player', message);
             input.value = '';
 
@@ -932,18 +1310,12 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({message: message})
+                body: JSON.stringify({
+                    message: message,
+                    chat_id: currentChatId
+                })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Сервер вернул не JSON ответ');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 hideLoading();
                 if (data.error) {
@@ -957,7 +1329,8 @@
 
                     if (data.character_created) {
                         currentCharacter = data.character;
-                        loadCharacters(); // Обновляем список персонажей
+                        currentCharacterName = data.character_name || 'Персонаж';
+                        loadCharacters();
                         showCharacterInfo('Новый персонаж', data.character);
                     }
                 }
@@ -968,19 +1341,144 @@
             });
         }
 
-        function addMessage(type, content) {
+        function addMessage(type, content, messageId = null) {
             const messages = document.getElementById('messages');
             const messageDiv = document.createElement('div');
+            const msgId = messageId !== null ? messageId : Date.now();
             messageDiv.className = `message ${type}-message`;
+            messageDiv.dataset.messageId = msgId;
 
-            const header = type === 'gm' ? '🎲 Гейм Мастер' : '🎮 Игрок';
+            const playerName = currentCharacterName || 'Игрок';
+            const header = type === 'gm' ? '🎲 Гейм Мастер' : `🎮 ${playerName}`;
+            
             messageDiv.innerHTML = `
                 <div class="message-header">${header}</div>
-                <div>${content.replace(/\n/g, '<br>')}</div>
+                <div class="message-content">${content.replace(/\n/g, '<br>')}</div>
+                <div class="message-actions">
+                    <button class="edit-btn" onclick="editMessage(${msgId})">✏️</button>
+                </div>
             `;
 
             messages.appendChild(messageDiv);
             messages.scrollTop = messages.scrollHeight;
+
+            // Применяем настройки стиля
+            const fontSize = localStorage.getItem('fontSize') || '14';
+            const contentEl = messageDiv.querySelector('.message-content');
+            contentEl.style.fontSize = fontSize + 'px';
+
+            if (type === 'gm') {
+                const gmColor = localStorage.getItem('gmColor') || '#ff6b6b';
+                messageDiv.style.background = `linear-gradient(135deg, ${gmColor}, ${gmColor}dd)`;
+            } else {
+                const playerColor = localStorage.getItem('playerColor') || '#4ecdc4';
+                messageDiv.style.background = `linear-gradient(135deg, ${playerColor}, ${playerColor}dd)`;
+            }
+
+            // Сохраняем сообщение в чат
+            if (!chats[currentChatId]) {
+                chats[currentChatId] = {
+                    name: 'Основной чат',
+                    messages: [],
+                    character: currentCharacter,
+                    character_name: currentCharacterName
+                };
+            }
+
+            const role = type === 'gm' ? 'assistant' : 'user';
+            chats[currentChatId].messages.push({
+                role: role,
+                content: content,
+                timestamp: new Date().toISOString()
+            });
+
+            saveChatData();
+        }
+
+        function editMessage(messageId) {
+            const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (!messageDiv) return;
+
+            const contentDiv = messageDiv.querySelector('.message-content');
+            const originalContent = contentDiv.textContent;
+
+            messageDiv.classList.add('edit-mode');
+            contentDiv.innerHTML = `
+                <textarea class="edit-input" id="edit-input-${messageId}">${originalContent}</textarea>
+                <div class="edit-actions">
+                    <button class="save-edit-btn" onclick="saveEdit(${messageId})">💾 Сохранить</button>
+                    <button class="cancel-edit-btn" onclick="cancelEdit(${messageId}, '${originalContent.replace(/'/g, "\\'")}')">❌ Отмена</button>
+                </div>
+            `;
+
+            editingMessageId = messageId;
+        }
+
+        function saveEdit(messageId) {
+            const input = document.getElementById(`edit-input-${messageId}`);
+            const newContent = input.value.trim();
+            
+            if (!newContent) return;
+
+            const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+            const contentDiv = messageDiv.querySelector('.message-content');
+            
+            contentDiv.innerHTML = newContent.replace(/\n/g, '<br>');
+            messageDiv.classList.remove('edit-mode');
+            
+            // Обновляем в чате
+            if (chats[currentChatId] && chats[currentChatId].messages[messageId]) {
+                chats[currentChatId].messages[messageId].content = newContent;
+                saveChatData();
+            }
+
+            // Отправляем обновленное сообщение на сервер
+            fetch('/edit_message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message_id: messageId,
+                    new_content: newContent,
+                    chat_id: currentChatId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.response) {
+                    // Удаляем все сообщения после редактируемого
+                    const messages = document.getElementById('messages');
+                    const allMessages = messages.querySelectorAll('.message');
+                    let found = false;
+                    
+                    allMessages.forEach(msg => {
+                        if (found) {
+                            msg.remove();
+                        }
+                        if (msg.dataset.messageId == messageId) {
+                            found = true;
+                        }
+                    });
+
+                    // Добавляем новый ответ ИИ
+                    addMessage('gm', data.response);
+                }
+            })
+            .catch(error => {
+                showError('Ошибка редактирования: ' + error.message);
+            });
+
+            editingMessageId = null;
+        }
+
+        function cancelEdit(messageId, originalContent) {
+            const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+            const contentDiv = messageDiv.querySelector('.message-content');
+            
+            contentDiv.innerHTML = originalContent.replace(/\n/g, '<br>');
+            messageDiv.classList.remove('edit-mode');
+            editingMessageId = null;
         }
 
         function showLoading() {
@@ -1010,7 +1508,8 @@
         }
 
         function handleKeyPress(event) {
-            if (event.key === 'Enter') {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
                 sendMessage();
             }
         }
@@ -1024,24 +1523,25 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({save_name: saveName})
+                body: JSON.stringify({
+                    save_name: saveName,
+                    chat_id: currentChatId
+                })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert('❌ ' + data.error);
+                    showNotification('❌ ' + data.error, 'error');
                 } else {
-                    alert('✅ ' + data.message);
+                    showNotification('✅ ' + data.message, 'success');
                     document.getElementById('save-name-input').value = '';
-                    loadSaves(); // Обновляем список сохранений
+                    loadSaves();
                 }
             })
             .catch(error => {
-                alert('Ошибка сохранения: ' + error.message);
+                showNotification('Ошибка сохранения: ' + error.message, 'error');
             });
         }
-
-        
 
         function uploadCharacter() {
             const fileInput = document.getElementById('characterFile');
@@ -1066,10 +1566,10 @@
                 } else {
                     showNotification(data.message, 'success');
                     currentCharacter = data.character;
+                    currentCharacterName = data.name || 'Персонаж';
                     fileInput.value = '';
-                    loadCharacters(); // Обновляем список персонажей
+                    loadCharacters();
                     
-                    // Автоматически начинаем игру
                     hideStartScreen();
                     introduceCharacterToAI();
                 }
@@ -1080,10 +1580,7 @@
         }
 
         function createCharacter() {
-            // Переходим в режим создания персонажа
             hideStartScreen();
-
-            // Отправляем запрос на создание персонажа
             const messageInput = document.getElementById('messageInput');
             messageInput.value = 'создать персонажа';
             sendMessage();

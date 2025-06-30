@@ -37,6 +37,7 @@ def create_user_folder(username, user_id):
     os.makedirs(folder_path, exist_ok=True)
     os.makedirs(os.path.join(folder_path, "saves"), exist_ok=True)
     os.makedirs(os.path.join(folder_path, "characters"), exist_ok=True)
+    os.makedirs(os.path.join(folder_path, "chats"), exist_ok=True)
     return folder_path
 
 def get_user_folder(username, user_id):
@@ -339,11 +340,99 @@ def get_characters():
 
     return jsonify({"characters": characters})
 
+@app.route('/get_chats', methods=['GET'])
+@login_required
+def get_chats():
+    """Получает список чатов пользователя"""
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    chats_folder = os.path.join(user_folder, "chats")
+    
+    if not os.path.exists(chats_folder):
+        os.makedirs(chats_folder, exist_ok=True)
+    
+    chats = {}
+    for filename in os.listdir(chats_folder):
+        if filename.endswith('.json'):
+            filepath = os.path.join(chats_folder, filename)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    chat_data = json.load(f)
+                chat_id = filename[:-5]  # убираем .json
+                chats[chat_id] = chat_data
+            except:
+                continue
+    
+    # Если нет чатов, создаем основной
+    if not chats:
+        default_chat = {
+            "name": "Основной чат",
+            "messages": [],
+            "character": None,
+            "character_name": None,
+            "created_at": datetime.now().isoformat()
+        }
+        chats['default'] = default_chat
+        save_chat_file('default', default_chat)
+    
+    return jsonify({"chats": chats})
+
+@app.route('/save_chat', methods=['POST'])
+@login_required
+def save_chat():
+    """Сохраняет данные чата"""
+    data = request.get_json()
+    chat_id = data.get('chat_id')
+    chat_data = data.get('chat_data')
+    
+    if not chat_id or not chat_data:
+        return jsonify({"error": "Неверные данные чата"})
+    
+    save_chat_file(chat_id, chat_data)
+    return jsonify({"success": True})
+
+@app.route('/delete_chat', methods=['POST'])
+@login_required
+def delete_chat():
+    """Удаляет чат"""
+    data = request.get_json()
+    chat_id = data.get('chat_id')
+    
+    if not chat_id:
+        return jsonify({"error": "ID чата не указан"})
+    
+    user_folder = get_user_folder(session['username'], session['user_id'])
+    filepath = os.path.join(user_folder, "chats", f"{chat_id}.json")
+    
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            return jsonify({"success": True, "message": "Чат удален"})
+        else:
+            return jsonify({"error": "Чат не найден"})
+    except Exception as e:
+        return jsonify({"error": f"Ошибка удаления чата: {str(e)}"})
+
+def save_chat_file(chat_id, chat_data):
+    """Сохраняет файл чата"""
+    try:
+        user_folder = get_user_folder(session['username'], session['user_id'])
+        chats_folder = os.path.join(user_folder, "chats")
+        os.makedirs(chats_folder, exist_ok=True)
+        
+        filepath = os.path.join(chats_folder, f"{chat_id}.json")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(chat_data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Ошибка сохранения чата: {e}")
+
 @app.route('/start_game', methods=['POST'])
 @login_required
 def start_game():
     if not API_KEY:
         return jsonify({"error": "API ключ не найден. Добавьте MISTRAL_API_KEY в переменные окружения."})
+
+    data = request.get_json()
+    chat_id = data.get('chat_id', 'default')
 
     rules = load_gm_rules()
     system_prompt = create_gm_system_prompt(rules)
@@ -352,12 +441,24 @@ def start_game():
     session['system_prompt'] = system_prompt
     session['character'] = None
     session['character_creation_mode'] = False
+    session['current_chat_id'] = chat_id
+
+    # Загружаем данные чата
+    chat_data = load_chat_data(chat_id)
+    if chat_data and chat_data.get('character'):
+        session['character'] = chat_data['character']
 
     # Проверяем, есть ли персонаж
     if 'character' not in session or not session['character']:
         response = "🎭 **Добро пожаловать в игру!**\n\nПрежде чем начать, мне нужно знать вашего персонажа. У вас есть три варианта:\n\n1. **Загрузить готового персонажа** - выберите из списка созданных персонажей\n2. **Создать нового персонажа** - напишите 'создать персонажа' и я помогу вам создать уникального героя\n3. **Загрузить файл персонажа** - используйте кнопку загрузки файла\n\nЧто выберете?"
     else:
         character_info = session['character']
+        
+        # Отправляем правила ГМ (без вывода ответа)
+        if rules:
+            rules_message = f"ГМ: Изучи эти правила и строго следуй им во время игры:\n\n{json.dumps(rules, ensure_ascii=False, indent=2)}\n\nОтвечай только 'Правила изучены' и ничего больше."
+            rules_response = chat_with_ai(rules_message, system_prompt, [])
+        
         response = chat_with_ai(f"Начни игру для персонажа: {character_info}", system_prompt, [])
 
     if response and response.strip():
@@ -365,8 +466,45 @@ def start_game():
             {"role": "user", "content": "Начни игру"},
             {"role": "assistant", "content": response}
         ]
+        
+        # Сохраняем в чат
+        update_chat_messages(chat_id, [
+            {"role": "user", "content": "Начни игру", "timestamp": datetime.now().isoformat()},
+            {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+        ])
 
     return jsonify({"response": response})
+
+def load_chat_data(chat_id):
+    """Загружает данные чата"""
+    try:
+        user_folder = get_user_folder(session['username'], session['user_id'])
+        filepath = os.path.join(user_folder, "chats", f"{chat_id}.json")
+        
+        if os.path.exists(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Ошибка загрузки чата: {e}")
+    return None
+
+def update_chat_messages(chat_id, messages):
+    """Обновляет сообщения в чате"""
+    try:
+        chat_data = load_chat_data(chat_id)
+        if not chat_data:
+            chat_data = {
+                "name": f"Чат {chat_id}",
+                "messages": [],
+                "character": session.get('character'),
+                "character_name": None,
+                "created_at": datetime.now().isoformat()
+            }
+        
+        chat_data['messages'].extend(messages)
+        save_chat_file(chat_id, chat_data)
+    except Exception as e:
+        print(f"Ошибка обновления чата: {e}")
 
 @app.route('/introduce_character', methods=['POST'])
 @login_required
@@ -374,15 +512,23 @@ def introduce_character():
     """Отдельный эндпоинт для представления персонажа ИИ"""
     data = request.get_json()
     character_description = data.get('character')
+    chat_id = data.get('chat_id', 'default')
     
     if not character_description:
         return jsonify({"error": "Персонаж не передан"})
     
     # Сохраняем персонажа в сессии
     session['character'] = character_description
+    session['current_chat_id'] = chat_id
     
     conversation_history = session.get('conversation_history', [])
     system_prompt = session.get('system_prompt', '')
+    
+    # Загружаем правила ГМ и отправляем их сначала (без вывода)
+    rules = load_gm_rules()
+    if rules:
+        rules_message = f"ГМ: Изучи эти правила и строго следуй им во время игры:\n\n{json.dumps(rules, ensure_ascii=False, indent=2)}\n\nОтвечай только 'Правила изучены' и ничего больше."
+        rules_response = chat_with_ai(rules_message, system_prompt, conversation_history)
     
     # Создаем специальное сообщение для представления персонажа
     introduce_message = f"ГМ: Изучи моего персонажа детально и запомни всю информацию о нем:\n\n{character_description}\n\nТеперь ты знаешь моего персонажа. Подтверди, что ты изучил и запомнил всю информацию о нем."
@@ -392,7 +538,6 @@ def introduce_character():
     # Проверяем, был ли персонаж успешно представлен
     character_introduced = False
     if response and response.strip():
-        # Ключевые слова, указывающие на успешное представление
         success_keywords = [
             "изучил", "запомнил", "понял", "знаю", "готов", 
             "приступим", "начинаем", "понятно", "ясно",
@@ -407,6 +552,12 @@ def introduce_character():
             {"role": "assistant", "content": response}
         ])
         session['conversation_history'] = conversation_history
+        
+        # Сохраняем в чат
+        update_chat_messages(chat_id, [
+            {"role": "user", "content": "🤖 Представляю своего персонажа ИИ", "timestamp": datetime.now().isoformat()},
+            {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+        ])
     
     return jsonify({
         "response": response,
@@ -417,6 +568,9 @@ def introduce_character():
 @login_required
 def start_actual_game():
     """Начинает настоящую игру после представления персонажа"""
+    data = request.get_json()
+    chat_id = data.get('chat_id', 'default')
+    
     if not session.get('character'):
         return jsonify({"error": "Персонаж не найден"})
     
@@ -435,6 +589,12 @@ def start_actual_game():
             {"role": "assistant", "content": response}
         ])
         session['conversation_history'] = conversation_history
+        
+        # Сохраняем в чат
+        update_chat_messages(chat_id, [
+            {"role": "user", "content": "🎮 Начинаю приключение!", "timestamp": datetime.now().isoformat()},
+            {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+        ])
     
     return jsonify({"response": response})
 
@@ -443,17 +603,20 @@ def start_actual_game():
 def send_message():
     data = request.get_json()
     user_message = data.get('message', '')
+    chat_id = data.get('chat_id', 'default')
 
     if not user_message:
         return jsonify({"error": "Пустое сообщение"})
 
+    session['current_chat_id'] = chat_id
+
     # Проверяем, находимся ли в режиме создания персонажа
     if session.get('character_creation_mode'):
-        return create_character_continue(user_message)
+        return create_character_continue(user_message, chat_id)
 
     # Проверяем, запрашивает ли игрок создание персонажа
     if 'создать персонажа' in user_message.lower() or 'создание персонажа' in user_message.lower():
-        return create_character_start()
+        return create_character_start(chat_id)
 
     # Проверяем, есть ли персонаж
     if not session.get('character'):
@@ -476,13 +639,68 @@ def send_message():
             {"role": "assistant", "content": response}
         ])
         session['conversation_history'] = conversation_history
+        
+        # Сохраняем в чат
+        update_chat_messages(chat_id, [
+            {"role": "user", "content": user_message, "timestamp": datetime.now().isoformat()},
+            {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+        ])
 
     return jsonify({"response": response})
 
-def create_character_start():
+@app.route('/edit_message', methods=['POST'])
+@login_required
+def edit_message():
+    """Редактирует сообщение и генерирует новый ответ ИИ"""
+    data = request.get_json()
+    message_id = data.get('message_id')
+    new_content = data.get('new_content', '')
+    chat_id = data.get('chat_id', 'default')
+    
+    if not new_content:
+        return jsonify({"error": "Пустое сообщение"})
+    
+    conversation_history = session.get('conversation_history', [])
+    system_prompt = session.get('system_prompt', '')
+    
+    # Обрезаем историю до редактируемого сообщения
+    if message_id < len(conversation_history):
+        conversation_history = conversation_history[:message_id]
+        conversation_history.append({"role": "user", "content": new_content})
+    
+    # Добавляем информацию о персонаже в контекст
+    character_info = session.get('character')
+    if character_info:
+        enhanced_prompt = f"{new_content}\n\n[ПЕРСОНАЖ ИГРОКА: {character_info}]"
+    else:
+        enhanced_prompt = new_content
+    
+    response = chat_with_ai(enhanced_prompt, system_prompt, conversation_history[:-1])
+    
+    if response and response.strip():
+        conversation_history.append({"role": "assistant", "content": response})
+        session['conversation_history'] = conversation_history
+        
+        # Обновляем чат
+        chat_data = load_chat_data(chat_id)
+        if chat_data:
+            # Обрезаем сообщения в чате и добавляем новые
+            if message_id < len(chat_data['messages']):
+                chat_data['messages'] = chat_data['messages'][:message_id]
+            
+            chat_data['messages'].extend([
+                {"role": "user", "content": new_content, "timestamp": datetime.now().isoformat()},
+                {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+            ])
+            save_chat_file(chat_id, chat_data)
+    
+    return jsonify({"response": response})
+
+def create_character_start(chat_id='default'):
     """Начинает процесс создания персонажа"""
     session['character_creation_history'] = []
     session['character_creation_mode'] = True
+    session['current_chat_id'] = chat_id
 
     response = """🎭 **СОЗДАНИЕ ПЕРСОНАЖА**
 
@@ -490,12 +708,18 @@ def create_character_start():
 
 **Первый вопрос:** Как зовут вашего персонажа и в каком мире или сеттинге вы хотели бы играть? (фэнтези, современность, киберпанк, космос и т.д.)"""
 
+    # Сохраняем в чат
+    update_chat_messages(chat_id, [
+        {"role": "user", "content": "создать персонажа", "timestamp": datetime.now().isoformat()},
+        {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+    ])
+
     return jsonify({
         "response": response,
         "character_creation": True
     })
 
-def create_character_continue(user_input):
+def create_character_continue(user_input, chat_id='default'):
     """Продолжает процесс создания персонажа"""
     system_prompt = session.get('system_prompt', '')
     creation_history = session.get('character_creation_history', [])
@@ -531,17 +755,40 @@ def create_character_continue(user_input):
 
         if end_idx > start_idx:
             character_description = response[start_idx:end_idx].strip()
+            
+            # Извлекаем имя персонажа
+            character_name = "Безымянный"
+            lines = character_description.split('\n')
+            for line in lines:
+                if line.startswith('Имя:'):
+                    character_name = line.replace('Имя:', '').strip()
+                    break
+            
             session['character'] = character_description
             session['character_creation_mode'] = False
             session.pop('character_creation_history', None)
 
             # Сохраняем персонажа
             save_character_to_file(character_description)
+            
+            # Обновляем чат с персонажем
+            chat_data = load_chat_data(chat_id)
+            if chat_data:
+                chat_data['character'] = character_description
+                chat_data['character_name'] = character_name
+                save_chat_file(chat_id, chat_data)
+
+            # Сохраняем в чат
+            update_chat_messages(chat_id, [
+                {"role": "user", "content": user_input, "timestamp": datetime.now().isoformat()},
+                {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+            ])
 
             return jsonify({
                 "response": response,
                 "character_created": True,
-                "character": character_description
+                "character": character_description,
+                "character_name": character_name
             })
 
     # Продолжаем процесс создания
@@ -550,6 +797,12 @@ def create_character_continue(user_input):
         {"role": "assistant", "content": response}
     ])
     session['character_creation_history'] = creation_history
+    
+    # Сохраняем в чат
+    update_chat_messages(chat_id, [
+        {"role": "user", "content": user_input, "timestamp": datetime.now().isoformat()},
+        {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+    ])
 
     return jsonify({"response": response, "character_created": False})
 
@@ -618,25 +871,24 @@ def save_game():
     """Сохраняет текущую игру"""
     data = request.get_json()
     save_name = data.get('save_name', f"save_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    chat_id = data.get('chat_id', 'default')
 
-    conversation_history = session.get('conversation_history', [])
-    character = session.get('character')
+    # Загружаем данные из чата
+    chat_data = load_chat_data(chat_id)
+    if not chat_data:
+        return jsonify({"error": "Данные чата не найдены"})
 
-    # Извлекаем имя персонажа
-    character_name = "Неизвестный персонаж"
-    if character:
-        lines = character.split('\n')
-        for line in lines:
-            if line.startswith('Имя:'):
-                character_name = line.replace('Имя:', '').strip()
-                break
+    conversation_history = chat_data.get('messages', [])
+    character = chat_data.get('character')
+    character_name = chat_data.get('character_name', "Неизвестный персонаж")
 
     save_data = {
         "timestamp": datetime.now().isoformat(),
         "conversation_history": conversation_history,
         "character": character,
         "character_name": character_name,
-        "save_name": save_name
+        "save_name": save_name,
+        "chat_id": chat_id
     }
 
     user_folder = get_user_folder(session['username'], session['user_id'])
