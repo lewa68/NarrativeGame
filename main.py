@@ -214,7 +214,7 @@ def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
 def index():
     if 'user_id' in session:
         return render_template('game.html')
-    return render_template('auth.html')
+    return render_template('index.html')
 
 @app.route('/register', methods=['POST'])
 def register():
