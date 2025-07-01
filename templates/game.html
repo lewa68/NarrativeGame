@@ -738,9 +738,13 @@
             
             <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" 
                  ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                <div class="upload-icon">📄</div>
-                <div class="upload-text">Нажмите или перетащите файл сюда</div>
-                <div class="upload-hint">Поддерживаются: TXT, JSON и другие текстовые форматы</div>
+                <div class="upload-icon" id="uploadIcon">📄</div>
+                <div class="upload-text" id="uploadText">Нажмите или перетащите файл сюда</div>
+                <div class="upload-hint" id="uploadHint">Поддерживаются: TXT, JSON и другие текстовые форматы</div>
+                <div class="selected-file" id="selectedFileInfo" style="display: none;">
+                    <div style="color: #38ef7d; font-weight: 600; margin-top: 10px;">✅ Файл выбран:</div>
+                    <div id="selectedFileName" style="margin-top: 5px; font-size: 14px; color: #ffd700;"></div>
+                </div>
                 <input type="file" id="fileInput" accept=".txt,.json,.md,.rtf,text/*" onchange="handleFileSelect(event)">
             </div>
 
@@ -1410,6 +1414,29 @@
             document.getElementById('characterNameInput').value = '';
             document.getElementById('uploadBtn').disabled = true;
             selectedFile = null;
+            resetFileUploadArea();
+        }
+
+        function showSelectedFile(file) {
+            // Скрываем стандартный текст
+            document.getElementById('uploadIcon').style.display = 'none';
+            document.getElementById('uploadText').style.display = 'none';
+            document.getElementById('uploadHint').style.display = 'none';
+            
+            // Показываем информацию о выбранном файле
+            document.getElementById('selectedFileInfo').style.display = 'block';
+            document.getElementById('selectedFileName').textContent = file.name;
+        }
+
+        function resetFileUploadArea() {
+            // Показываем стандартный текст
+            document.getElementById('uploadIcon').style.display = 'block';
+            document.getElementById('uploadText').style.display = 'block';
+            document.getElementById('uploadHint').style.display = 'block';
+            
+            // Скрываем информацию о файле
+            document.getElementById('selectedFileInfo').style.display = 'none';
+            document.getElementById('selectedFileName').textContent = '';
         }
 
         function closeFileUploadModal() {
@@ -1420,6 +1447,7 @@
             const file = event.target.files[0];
             if (file) {
                 selectedFile = file;
+                showSelectedFile(file);
                 updateUploadButton();
             }
         }
@@ -1440,6 +1468,7 @@
             const files = event.dataTransfer.files;
             if (files.length > 0) {
                 selectedFile = files[0];
+                showSelectedFile(files[0]);
                 updateUploadButton();
             }
         }
