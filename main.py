@@ -1,6 +1,5 @@
 import pip
-pip.main(['install', 'flask'])
-pip.main(['install', 'werkzeug'])
+pip.main(['install', 'flask', 'requests', 'mistralai','werkzeug'])
 import requests
 import json
 import os
