@@ -173,6 +173,62 @@
         .info li:before {
             content: "✨ ";
         }
+
+        .checkbox-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 14px;
+            user-select: none;
+            transition: all 0.3s;
+        }
+
+        .checkbox-container:hover {
+            opacity: 0.8;
+        }
+
+        .checkbox-container input {
+            display: none;
+        }
+
+        .checkmark {
+            height: 20px;
+            width: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            margin-right: 10px;
+            position: relative;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+
+        .checkbox-container input:checked ~ .checkmark {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            border-color: #11998e;
+        }
+
+        .checkmark:after {
+            content: "";
+            position: absolute;
+            display: none;
+            left: 6px;
+            top: 2px;
+            width: 6px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .checkbox-container input:checked ~ .checkmark:after {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -200,6 +256,13 @@
             <div class="form-group">
                 <label for="login-password">Пароль:</label>
                 <input type="password" id="login-password" required>
+            </div>
+            <div class="checkbox-group">
+                <label class="checkbox-container">
+                    <input type="checkbox" id="remember-me">
+                    <span class="checkmark"></span>
+                    Запомнить меня
+                </label>
             </div>
             <button type="submit" class="submit-btn">🚀 Войти в игру</button>
         </form>
@@ -279,6 +342,7 @@
 
             const username = document.getElementById('login-username').value.trim();
             const password = document.getElementById('login-password').value.trim();
+            const rememberMe = document.getElementById('remember-me').checked;
 
             if (!username || !password) {
                 showError('Пожалуйста, заполните все поля');
@@ -295,7 +359,8 @@
                 },
                 body: JSON.stringify({
                     username: username,
-                    password: password
+                    password: password,
+                    remember_me: rememberMe
                 })
             })
             .then(response => response.json())

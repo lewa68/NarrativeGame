@@ -5,7 +5,7 @@ import sqlite3
 import hashlib
 import secrets
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from mistralai import Mistral
@@ -246,6 +246,7 @@ def login():
     data = request.get_json()
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
+    remember_me = data.get('remember_me', False)
 
     if not username or not password:
         return jsonify({"error": "Логин и пароль не могут быть пустыми"})
@@ -262,6 +263,15 @@ def login():
 
         session['user_id'] = user[0]
         session['username'] = username
+        
+        # Устанавливаем срок жизни сессии в зависимости от чекбокса
+        if remember_me:
+            # Сессия на 30 дней
+            session.permanent = True
+            app.permanent_session_lifetime = timedelta(days=30)
+        else:
+            # Сессия до закрытия браузера
+            session.permanent = False
 
         return jsonify({"success": True, "message": "Вход выполнен успешно!"})
 
