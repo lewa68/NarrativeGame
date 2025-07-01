@@ -114,6 +114,7 @@
             padding-bottom: 100px; /* Отступ для поля ввода */
             background: rgba(0,0,0,0.1);
             min-height: 0; /* Важно для правильной работы flex */
+            max-height: calc(100vh - 200px); /* Ограничиваем высоту */
         }
 
         .message {
@@ -555,6 +556,14 @@
     <div class="main-container">
         <div class="sidebar" id="sidebar">
             <div class="sidebar-scrollable">
+                <!-- Чаты -->
+                <div class="sidebar-section">
+                    <h3>💬 Чаты</h3>
+                    <div id="chats-list"></div>
+                    <input type="text" id="new-chat-name" class="small-input" placeholder="Название нового чата">
+                    <button class="action-btn primary" onclick="createNewChat()">➕ Новый чат</button>
+                </div>
+
                 <!-- Текущий персонаж -->
                 <div class="sidebar-section" id="current-character-section" style="display: none;">
                     <div class="current-character">
@@ -620,10 +629,13 @@
         let selectedSaveFile = null;
         let gameStarted = false;
         let currentChatId = 'default';
+        let chatsData = {};
+        let currentChatUnsaved = false;
 
         // Загружаем все данные при загрузке страницы
         window.onload = function() {
             loadUserInfo();
+            loadChats();
             loadCharacters();
             loadSaves();
         };
@@ -641,6 +653,175 @@
             })
             .catch(error => {
                 console.error('Ошибка загрузки информации о пользователе:', error);
+            });
+        }
+
+        function loadChats() {
+            fetch('/get_chats')
+            .then(response => response.json())
+            .then(data => {
+                chatsData = data.chats || {};
+                updateChatsUI();
+                
+                // Если текущий чат не существует, переключаемся на первый доступный
+                if (!chatsData[currentChatId]) {
+                    const chatIds = Object.keys(chatsData);
+                    if (chatIds.length > 0) {
+                        currentChatId = chatIds[0];
+                    }
+                }
+                
+                loadChatMessages(currentChatId);
+            })
+            .catch(error => {
+                console.error('Ошибка загрузки чатов:', error);
+            });
+        }
+
+        function updateChatsUI() {
+            const list = document.getElementById('chats-list');
+            list.innerHTML = '';
+
+            Object.entries(chatsData).forEach(([chatId, chatData]) => {
+                const item = document.createElement('div');
+                item.className = 'list-item';
+                if (chatId === currentChatId) {
+                    item.classList.add('selected');
+                }
+                
+                const lastMessage = chatData.messages && chatData.messages.length > 0 
+                    ? chatData.messages[chatData.messages.length - 1].content.substring(0, 50) + '...'
+                    : 'Пустой чат';
+
+                item.innerHTML = `
+                    <div class="list-item-content">
+                        <h4>${chatData.name || chatId}</h4>
+                        <p>${lastMessage}</p>
+                        <p style="font-size: 0.65em;">${chatData.messages ? chatData.messages.length : 0} сообщений</p>
+                    </div>
+                    <button class="delete-btn" onclick="deleteChat('${chatId}', event)" title="Удалить">×</button>
+                `;
+                item.onclick = (e) => {
+                    if (!e.target.classList.contains('delete-btn')) {
+                        switchToChat(chatId);
+                    }
+                };
+                list.appendChild(item);
+            });
+
+            // Обновляем заголовок чата
+            const chatHeader = document.getElementById('chat-name');
+            if (chatsData[currentChatId]) {
+                chatHeader.textContent = chatsData[currentChatId].name || currentChatId;
+            }
+        }
+
+        function createNewChat() {
+            const nameInput = document.getElementById('new-chat-name');
+            const chatName = nameInput.value.trim() || `Чат ${Date.now()}`;
+            const chatId = `chat_${Date.now()}`;
+
+            // Создаем новый чат только в памяти (не сохраняем сразу)
+            chatsData[chatId] = {
+                name: chatName,
+                messages: [],
+                character: currentCharacter,
+                character_name: currentCharacterName,
+                created_at: new Date().toISOString()
+            };
+
+            nameInput.value = '';
+            currentChatId = chatId;
+            currentChatUnsaved = true;
+
+            updateChatsUI();
+            clearMessages();
+            showNotification(`Создан новый чат: ${chatName}`, 'success');
+        }
+
+        function switchToChat(chatId) {
+            if (chatId === currentChatId) return;
+
+            currentChatId = chatId;
+            currentChatUnsaved = false;
+            updateChatsUI();
+            loadChatMessages(chatId);
+        }
+
+        function loadChatMessages(chatId) {
+            const chatData = chatsData[chatId];
+            if (!chatData) return;
+
+            clearMessages();
+
+            // Загружаем персонажа из чата
+            if (chatData.character) {
+                currentCharacter = chatData.character;
+                currentCharacterName = chatData.character_name || 'Персонаж';
+                updateCurrentCharacterDisplay();
+            }
+
+            // Загружаем сообщения
+            if (chatData.messages && chatData.messages.length > 0) {
+                chatData.messages.forEach(msg => {
+                    if (msg.role === 'user') {
+                        addMessage('player', msg.content);
+                    } else if (msg.role === 'assistant') {
+                        addMessage('gm', msg.content);
+                    }
+                });
+                hideStartScreen();
+            } else {
+                showStartScreen();
+            }
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        function showStartScreen() {
+            document.getElementById('start-screen').style.display = 'flex';
+            document.getElementById('game-area').style.display = 'none';
+            gameStarted = false;
+        }
+
+        function deleteChat(chatId, event) {
+            event.stopPropagation();
+
+            if (Object.keys(chatsData).length <= 1) {
+                showNotification('Нельзя удалить последний чат', 'error');
+                return;
+            }
+
+            if (!confirm('Удалить этот чат?')) return;
+
+            fetch('/delete_chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({chat_id: chatId})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    delete chatsData[chatId];
+                    
+                    // Если удаляем текущий чат, переключаемся на другой
+                    if (chatId === currentChatId) {
+                        const remainingChats = Object.keys(chatsData);
+                        if (remainingChats.length > 0) {
+                            switchToChat(remainingChats[0]);
+                        }
+                    }
+                    
+                    updateChatsUI();
+                    showNotification('Чат удален', 'success');
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Ошибка удаления: ' + error.message, 'error');
             });
         }
 
@@ -885,6 +1066,12 @@
             addMessage('player', message);
             input.value = '';
 
+            // Если чат новый и несохраненный, сохраняем его после первого сообщения
+            if (currentChatUnsaved) {
+                currentChatUnsaved = false;
+                saveChatAfterFirstMessage();
+            }
+
             showLoading();
 
             fetch('/send_message', {
@@ -907,6 +1094,19 @@
                 } else {
                     addMessage('gm', data.response);
 
+                    // Обновляем данные чата в памяти
+                    if (chatsData[currentChatId]) {
+                        chatsData[currentChatId].messages = chatsData[currentChatId].messages || [];
+                        chatsData[currentChatId].messages.push(
+                            {role: 'user', content: message, timestamp: new Date().toISOString()},
+                            {role: 'assistant', content: data.response, timestamp: new Date().toISOString()}
+                        );
+                        chatsData[currentChatId].character = currentCharacter;
+                        chatsData[currentChatId].character_name = currentCharacterName;
+                    }
+
+                    updateChatsUI();
+
                     if (data.character_created) {
                         currentCharacter = data.character;
                         currentCharacterName = data.character_name || 'Персонаж';
@@ -920,6 +1120,14 @@
                 hideLoading();
                 showError('Ошибка соединения: ' + error.message);
             });
+        }
+
+        function saveChatAfterFirstMessage() {
+            // Этот чат теперь будет сохранен на сервере после отправки сообщения
+            // Обновляем UI чтобы показать, что чат сохранен
+            setTimeout(() => {
+                updateChatsUI();
+            }, 500);
         }
 
         function addMessage(type, content) {

@@ -378,6 +378,25 @@ def save_chat_file(chat_id, chat_data):
     except Exception as e:
         print(f"Ошибка сохранения чата: {e}")
 
+@app.route('/create_chat', methods=['POST'])
+@login_required
+def create_chat():
+    """Создает новый чат"""
+    data = request.get_json()
+    chat_name = data.get('chat_name', 'Новый чат')
+    chat_id = data.get('chat_id', f"chat_{int(datetime.now().timestamp())}")
+
+    chat_data = {
+        "name": chat_name,
+        "messages": [],
+        "character": session.get('character'),
+        "character_name": session.get('character_name'),
+        "created_at": datetime.now().isoformat()
+    }
+
+    save_chat_file(chat_id, chat_data)
+    return jsonify({"success": True, "chat_id": chat_id, "chat_data": chat_data})
+
 @app.route('/delete_chat', methods=['POST'])
 @login_required
 def delete_chat():
