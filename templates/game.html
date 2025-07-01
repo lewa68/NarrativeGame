@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -782,7 +781,7 @@
         <div class="modal-content">
             <span class="modal-close" onclick="closeFileUploadModal()">&times;</span>
             <h3>📁 Загрузка персонажа</h3>
-            
+
             <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" 
                  ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
                 <div class="upload-icon" id="uploadIcon">📄</div>
@@ -875,14 +874,14 @@
             .then(data => {
                 chatsData = data.chats || {};
                 updateChatsUI();
-                
+
                 if (!chatsData[currentChatId]) {
                     const chatIds = Object.keys(chatsData);
                     if (chatIds.length > 0) {
                         currentChatId = chatIds[0];
                     }
                 }
-                
+
                 loadChatMessages(currentChatId);
             })
             .catch(error => {
@@ -900,7 +899,7 @@
                 if (chatId === currentChatId) {
                     item.classList.add('selected');
                 }
-                
+
                 const lastMessage = chatData.messages && chatData.messages.length > 0 
                     ? chatData.messages[chatData.messages.length - 1].content.substring(0, 50) + '...'
                     : 'Пустой чат';
@@ -932,7 +931,7 @@
             const chatName = nameInput.value.trim() || `Чат ${Date.now()}`;
             const chatId = `chat_${Date.now()}`;
 
-            // Вариант 1: Если персонаж уже выбран - создаем чат с персонажем
+            // Вариант 1: Если персонаж уже выбран - создаем чат сперсонажем
             if (selectedCharacterFile) {
                 chatsData[chatId] = {
                     name: chatName,
@@ -947,7 +946,7 @@
 
                 updateChatsUI();
                 clearMessages();
-                
+
                 // Автоматически загружаем выбранного персонажа в новый чат
                 const characterName = document.querySelector(`[onclick*="'${selectedCharacterFile}'"]`)?.querySelector('h4')?.textContent || 'Персонаж';
                 loadCharacterAndStartGame(selectedCharacterFile, characterName);
@@ -965,7 +964,7 @@
                 nameInput.value = '';
                 currentChatId = chatId;
                 currentChatUnsaved = true;
-                
+
                 currentCharacter = null;
                 currentCharacterName = null;
                 updateCurrentCharacterDisplay();
@@ -978,7 +977,7 @@
             }
         }
 
-        
+
 
         function switchToChat(chatId) {
             if (chatId === currentChatId) return;
@@ -1080,7 +1079,7 @@
             gameStarted = true;
         }
 
-        
+
 
         let pendingDeleteAction = null;
 
@@ -1106,14 +1105,14 @@
                     .then(data => {
                         if (data.success) {
                             delete chatsData[chatId];
-                            
+
                             if (chatId === currentChatId) {
                                 const remainingChats = Object.keys(chatsData);
                                 if (remainingChats.length > 0) {
                                     switchToChat(remainingChats[0]);
                                 }
                             }
-                            
+
                             updateChatsUI();
                             showNotification('Чат удален', 'success');
                         } else {
@@ -1145,10 +1144,10 @@
                     data.characters.forEach(char => {
                         const item = document.createElement('div');
                         item.className = 'list-item';
-                        
+
                         // Используем имя из файла без системных цифр
                         const displayName = char.name || char.filename;
-                        
+
                         item.innerHTML = `
                             <div class="list-item-content">
                                 <h4>${displayName}</h4>
@@ -1210,7 +1209,7 @@
         function selectCharacter(filename, name, element) {
             // Проверяем, есть ли текущий чат и есть ли в нем уже персонаж
             const currentChat = chatsData[currentChatId];
-            
+
             if (currentChat && currentChat.character_id) {
                 // Если в текущем чате уже есть персонаж - показываем модальное окно
                 showCharacterChangeModal(filename, name, element);
@@ -1228,9 +1227,9 @@
             const modal = document.getElementById('characterChangeModal');
             const message = document.getElementById('characterChangeMessage');
             message.textContent = `В текущем чате уже выбран персонаж. Создать новый чат с персонажем "${name}"?`;
-            
+
             modal.style.display = 'block';
-            
+
             // Сохраняем данные для обработки
             modal.dataset.filename = filename;
             modal.dataset.name = name;
@@ -1243,14 +1242,14 @@
             const name = modal.dataset.name;
             const elementIndex = parseInt(modal.dataset.elementIndex);
             const element = document.getElementById('characters-list').children[elementIndex];
-            
+
             clearSelections();
             element.classList.add('selected');
             selectedCharacterFile = filename;
             selectedSaveFile = null;
             updateSelectedCharacterIndicator(name);
             createNewChat(); // Создастся с выбранным персонажем (вариант 1)
-            
+
             closeCharacterChangeModal();
         }
 
@@ -1262,10 +1261,10 @@
             const modal = document.getElementById('confirmDeleteModal');
             const titleElement = document.getElementById('confirmDeleteTitle');
             const messageElement = document.getElementById('confirmDeleteMessage');
-            
+
             titleElement.textContent = title;
             messageElement.textContent = message;
-            
+
             pendingDeleteAction = confirmCallback;
             modal.style.display = 'block';
         }
@@ -1298,7 +1297,7 @@
             });
             selectedCharacterFile = null;
             selectedSaveFile = null;
-            
+
             // Скрываем индикатор выбранного персонажа
             document.getElementById('selected-character-indicator').style.display = 'none';
         }
@@ -1306,7 +1305,7 @@
         function updateSelectedCharacterIndicator(characterName) {
             const indicator = document.getElementById('selected-character-indicator');
             const nameElement = document.getElementById('selected-character-name');
-            
+
             if (selectedCharacterFile && characterName) {
                 nameElement.textContent = characterName;
                 indicator.style.display = 'block';
@@ -1329,7 +1328,7 @@
             .then(response => response.json())
             .then(data => {
                 hideLoading();
-                
+
                 if (data.success) {
                     currentCharacter = data.character;
                     currentCharacterName = data.character_name;
@@ -1349,7 +1348,7 @@
 
         function loadCharacterAndStartGame(filename, characterName) {
             console.log('Начинаем загрузку персонажа:', filename, 'для чата:', currentChatId);
-            
+
             // Сразу скрываем стартовый экран и показываем чат
             hideStartScreen();
             showLoading();
@@ -1412,7 +1411,7 @@
                     if (!chatsData[currentChatId].messages) {
                         chatsData[currentChatId].messages = [];
                     }
-                    
+
                     chatsData[currentChatId].messages.push(
                         {role: 'user', content: 'Начни игру'},
                         {role: 'assistant', content: data.response}
@@ -1435,7 +1434,7 @@
             });
         }
 
-        
+
 
         function updateCurrentCharacterDisplay() {
             const section = document.getElementById('current-character-section');
@@ -1538,7 +1537,7 @@
         function showLoading() {
             // Сначала удаляем все существующие индикаторы загрузки
             hideLoading();
-            
+
             const messages = document.getElementById('messages');
             const loadingDiv = document.createElement('div');
             loadingDiv.id = 'gm-loading';
@@ -1549,16 +1548,42 @@
         }
 
         function hideLoading() {
-            // Удаляем все элементы загрузки по всем возможным селекторам
-            const selectors = ['.loading', '#loading', '#gm-loading', '.gm-loading-indicator'];
+            // Более агрессивная очистка всех возможных индикаторов загрузки
+            const selectors = [
+                '.loading', 
+                '#loading', 
+                '#gm-loading', 
+                '.gm-loading-indicator',
+                '[class*="loading"]'
+            ];
+
             selectors.forEach(selector => {
                 const elements = document.querySelectorAll(selector);
                 elements.forEach(element => {
-                    if (element && element.parentNode) {
-                        element.parentNode.removeChild(element);
+                    try {
+                        if (element && element.parentNode) {
+                            element.parentNode.removeChild(element);
+                        }
+                    } catch (e) {
+                        console.log('Элемент уже удален:', e);
                     }
                 });
             });
+
+            // Дополнительная очистка через innerText поиск
+            const messages = document.getElementById('messages');
+            if (messages) {
+                const allDivs = messages.querySelectorAll('div');
+                allDivs.forEach(div => {
+                    if (div.textContent && div.textContent.includes('ГМ размышляет')) {
+                        try {
+                            div.remove();
+                        } catch (e) {
+                            console.log('Не удалось удалить элемент:', e);
+                        }
+                    }
+                });
+            }
         }
 
         function showError(message) {
@@ -1618,7 +1643,7 @@
             document.getElementById('uploadIcon').style.display = 'none';
             document.getElementById('uploadText').style.display = 'none';
             document.getElementById('uploadHint').style.display = 'none';
-            
+
             // Показываем информацию о выбранном файле
             document.getElementById('selectedFileInfo').style.display = 'block';
             document.getElementById('selectedFileName').textContent = file.name;
@@ -1629,7 +1654,7 @@
             document.getElementById('uploadIcon').style.display = 'block';
             document.getElementById('uploadText').style.display = 'block';
             document.getElementById('uploadHint').style.display = 'block';
-            
+
             // Скрываем информацию о файле
             document.getElementById('selectedFileInfo').style.display = 'none';
             document.getElementById('selectedFileName').textContent = '';
@@ -1660,7 +1685,7 @@
         function handleFileDrop(event) {
             event.preventDefault();
             event.currentTarget.classList.remove('dragover');
-            
+
             const files = event.dataTransfer.files;
             if (files.length > 0) {
                 selectedFile = files[0];
@@ -1672,7 +1697,7 @@
         function updateUploadButton() {
             const nameInput = document.getElementById('characterNameInput');
             const uploadBtn = document.getElementById('uploadBtn');
-            
+
             if (selectedFile && nameInput.value.trim()) {
                 uploadBtn.disabled = false;
             } else {
@@ -1685,7 +1710,7 @@
 
         function uploadCharacterFile() {
             const characterName = document.getElementById('characterNameInput').value.trim();
-            
+
             if (!selectedFile || !characterName) {
                 showNotification('Выберите файл и введите имя персонажа', 'error');
                 return;
@@ -1733,7 +1758,7 @@
 
             // Получаем имя персонажа из интерфейса
             const characterName = event.target.parentElement.querySelector('h4').textContent;
-            
+
             showConfirmDelete(
                 'Удаление персонажа',
                 `Вы уверены, что хотите удалить персонажа "${characterName}"? Это действие нельзя отменить.`,
@@ -1831,7 +1856,7 @@
             const fileModal = document.getElementById('fileUploadModal');
             const charModal = document.getElementById('characterChangeModal');
             const deleteModal = document.getElementById('confirmDeleteModal');
-            
+
             if (event.target === fileModal) {
                 closeFileUploadModal();
             }
