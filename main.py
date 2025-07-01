@@ -738,12 +738,18 @@ def save_character_to_file(character_description):
 @app.route('/load_character', methods=['POST'])
 @login_required
 def load_character():
-    """Загружает персонажа из сохраненных"""
+    """Загружает персонажа из сохраненных и начинает игру"""
     data = request.get_json()
     filename = data.get('filename')
+    chat_id = data.get('chat_id', 'default')
 
     if not filename:
         return jsonify({"error": "Не указано имя файла"})
+
+    # Проверяем, есть ли уже персонаж в текущем чате
+    chat_data = load_chat_data(chat_id)
+    if chat_data and chat_data.get('character'):
+        return jsonify({"error": "Персонаж для этой истории уже выбран"})
 
     user_folder = get_user_folder(session['username'], session['user_id'])
     filepath = os.path.join(user_folder, "characters", f"{filename}.json")
@@ -752,18 +758,81 @@ def load_character():
         with open(filepath, 'r', encoding='utf-8') as f:
             character_data = json.load(f)
 
+        # Извлекаем имя из названия файла
+        character_name = filename.replace('_', ' ')
+
         session['character'] = character_data['description']
-        return jsonify({
-            "success": True,
-            "character": character_data['description'],
-            "name": character_data['name'],
-            "message": f"Персонаж '{character_data['name']}' загружен"
-        })
+        session['character_name'] = character_name
+        session['current_chat_id'] = chat_id
+
+        # Загружаем правила ГМ
+        rules = load_gm_rules()
+        system_prompt = create_gm_system_prompt(rules)
+        session['system_prompt'] = system_prompt
+
+        # Автоматически начинаем игру
+        enhanced_prompt = f"Начни игру\n\n[ПЕРСОНАЖ ИГРОКА: {character_data['description']}]"
+        response = chat_with_ai(enhanced_prompt, system_prompt, [])
+
+        if response and response.strip():
+            # Создаем название чата из первых слов ответа
+            chat_name = create_chat_name_from_response(response)
+            
+            # Обновляем данные чата
+            if not chat_data:
+                chat_data = {
+                    "name": chat_name,
+                    "messages": [],
+                    "character": character_data['description'],
+                    "character_name": character_name,
+                    "created_at": datetime.now().isoformat()
+                }
+
+            chat_data['character'] = character_data['description']
+            chat_data['character_name'] = character_name
+            chat_data['name'] = chat_name
+
+            # Добавляем сообщения
+            messages = [
+                {"role": "user", "content": "Начни игру", "timestamp": datetime.now().isoformat()},
+                {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+            ]
+            chat_data['messages'] = messages
+
+            # Сохраняем чат
+            save_chat_file(chat_id, chat_data)
+            
+            # Обновляем сессию
+            session['conversation_history'] = messages
+
+            return jsonify({
+                "success": True,
+                "character": character_data['description'],
+                "character_name": character_name,
+                "response": response,
+                "chat_name": chat_name,
+                "game_started": True,
+                "message": f"Персонаж '{character_name}' загружен и игра началась"
+            })
 
     except FileNotFoundError:
         return jsonify({"error": "Файл персонажа не найден"})
     except Exception as e:
         return jsonify({"error": f"Ошибка загрузки персонажа: {str(e)}"})
+
+def create_chat_name_from_response(response):
+    """Создает название чата из первых слов ответа ИИ"""
+    import re
+    # Убираем разметку и получаем первые слова
+    clean_response = re.sub(r'[*#_\-\[\]()]', '', response)
+    words = clean_response.split()[:4]  # Берем первые 4 слова
+    chat_name = ' '.join(words)
+    
+    # Ограничиваем длину
+    if len(chat_name) > 30:
+        chat_name = chat_name[:27] + '...'
+    
+    return chat_name or "Новое приключение"
 
 @app.route('/save_game', methods=['POST'])
 @login_required

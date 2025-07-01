@@ -725,17 +725,24 @@
             chatsData[chatId] = {
                 name: chatName,
                 messages: [],
-                character: currentCharacter,
-                character_name: currentCharacterName,
+                character: null,  // Новый чат без персонажа
+                character_name: null,
                 created_at: new Date().toISOString()
             };
 
             nameInput.value = '';
             currentChatId = chatId;
             currentChatUnsaved = true;
+            
+            // Сбрасываем текущего персонажа для нового чата
+            currentCharacter = null;
+            currentCharacterName = null;
+            updateCurrentCharacterDisplay();
 
             updateChatsUI();
             clearMessages();
+            clearSelections();
+            showStartScreen();
             showNotification(`Создан новый чат: ${chatName}`, 'success');
         }
 
@@ -746,6 +753,9 @@
             currentChatUnsaved = false;
             updateChatsUI();
             loadChatMessages(chatId);
+            
+            // Снимаем выделение с персонажей при переключении чата
+            clearSelections();
         }
 
         function loadChatMessages(chatId) {
@@ -843,16 +853,20 @@
                     data.characters.forEach(char => {
                         const item = document.createElement('div');
                         item.className = 'list-item';
+                        
+                        // Используем имя из файла (filename) как основное имя
+                        const displayName = char.filename.replace(/_/g, ' ');
+                        
                         item.innerHTML = `
                             <div class="list-item-content">
-                                <h4>${char.name}</h4>
+                                <h4>${displayName}</h4>
                                 <p>${char.description}</p>
                             </div>
                             <button class="delete-btn" onclick="deleteCharacter('${char.filename}', event)" title="Удалить">×</button>
                         `;
                         item.onclick = (e) => {
                             if (!e.target.classList.contains('delete-btn')) {
-                                selectCharacter(char.filename, char.name, item);
+                                selectCharacter(char.filename, displayName, item);
                             }
                         };
                         list.appendChild(item);
@@ -902,13 +916,25 @@
         }
 
         function selectCharacter(filename, name, element) {
+            // Проверяем, есть ли уже персонаж в текущем чате
+            if (currentCharacter && chatsData[currentChatId] && chatsData[currentChatId].character) {
+                showNotification('Персонаж для этой истории уже выбран', 'error');
+                return;
+            }
+
             clearSelections();
             element.classList.add('selected');
 
             selectedCharacterFile = filename;
             selectedSaveFile = null;
 
-            showNotification(`Персонаж "${name}" выбран`, 'success');
+            // Блокируем поле ввода
+            const messageInput = document.getElementById('messageInput');
+            messageInput.disabled = true;
+            messageInput.placeholder = 'Загрузка персонажа...';
+
+            // Автоматически загружаем персонажа и начинаем игру
+            loadCharacterAndStartGame(filename);
         }
 
         function selectSave(filename, element) {
@@ -963,6 +989,71 @@
             })
             .catch(error => {
                 hideLoading();
+                showNotification('Ошибка загрузки персонажа: ' + error.message, 'error');
+            });
+        }
+
+        function loadCharacterAndStartGame(filename) {
+            showLoading();
+
+            fetch('/load_character', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: filename,
+                    chat_id: currentChatId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                
+                // Разблокируем поле ввода
+                const messageInput = document.getElementById('messageInput');
+                messageInput.disabled = false;
+                messageInput.placeholder = 'Введите ваше действие...';
+
+                if (data.success) {
+                    currentCharacter = data.character;
+                    currentCharacterName = data.character_name;
+
+                    // Обновляем UI
+                    updateCurrentCharacterDisplay();
+                    hideStartScreen();
+
+                    // Обновляем данные чата
+                    if (data.game_started) {
+                        chatsData[currentChatId] = {
+                            name: data.chat_name,
+                            messages: [
+                                {role: 'user', content: 'Начни игру'},
+                                {role: 'assistant', content: data.response}
+                            ],
+                            character: data.character,
+                            character_name: data.character_name
+                        };
+
+                        // Обновляем UI чатов
+                        updateChatsUI();
+
+                        // Показываем сообщения
+                        clearMessages();
+                        addMessage('gm', data.response);
+
+                        showNotification(data.message, 'success');
+                    }
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                
+                // Разблокируем поле ввода в случае ошибки
+                const messageInput = document.getElementById('messageInput');
+                messageInput.disabled = false;
+                messageInput.placeholder = 'Введите ваше действие...';
+                
                 showNotification('Ошибка загрузки персонажа: ' + error.message, 'error');
             });
         }
