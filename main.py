@@ -23,8 +23,8 @@ app.secret_key = secrets.token_hex(16)
 
 # Глобальная конфигурация контекста
 CONTEXT_CONFIG = {
-    "max_messages": 50,
-    "max_tokens": 128000,
+    "max_messages": 500,
+    "max_tokens": 1280000,
     "summary_enabled": True,
     "context_size": "medium"
 }
