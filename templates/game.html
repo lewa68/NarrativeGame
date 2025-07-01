@@ -653,6 +653,45 @@
         .hidden {
             display: none !important;
         }
+
+        /* Красивые скроллбары */
+        .messages::-webkit-scrollbar,
+        .sidebar-scrollable::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages::-webkit-scrollbar-track,
+        .sidebar-scrollable::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .messages::-webkit-scrollbar-thumb,
+        .sidebar-scrollable::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+            transition: background 0.2s;
+        }
+
+        .messages::-webkit-scrollbar-thumb:hover,
+        .sidebar-scrollable::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* Убираем черный фон за полем ввода */
+        .input-area {
+            position: fixed;
+            bottom: 0;
+            left: 300px;
+            right: 0;
+            padding: 20px;
+            background: rgba(30,60,114,0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            gap: 12px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
@@ -756,6 +795,19 @@
             <div class="modal-buttons">
                 <button class="modal-btn secondary" onclick="closeFileUploadModal()">Отмена</button>
                 <button class="modal-btn primary" onclick="uploadCharacterFile()" id="uploadBtn" disabled>Загрузить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения смены персонажа -->
+    <div id="characterChangeModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeCharacterChangeModal()">&times;</span>
+            <h3>🔄 Смена персонажа</h3>
+            <p id="characterChangeMessage" style="margin-bottom: 25px; line-height: 1.5;"></p>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeCharacterChangeModal()">Отмена</button>
+                <button class="modal-btn primary" onclick="confirmCharacterChange()">Создать новый чат</button>
             </div>
         </div>
     </div>
@@ -1107,15 +1159,8 @@
             const currentChat = chatsData[currentChatId];
             
             if (currentChat && currentChat.character_id) {
-                // Если в текущем чате уже есть персонаж - предлагаем создать новый чат
-                if (confirm(`В текущем чате уже выбран персонаж. Создать новый чат с персонажем "${name}"?`)) {
-                    clearSelections();
-                    element.classList.add('selected');
-                    selectedCharacterFile = filename;
-                    selectedSaveFile = null;
-                    updateSelectedCharacterIndicator(name);
-                    createNewChat(); // Создастся с выбранным персонажем (вариант 1)
-                }
+                // Если в текущем чате уже есть персонаж - показываем модальное окно
+                showCharacterChangeModal(filename, name, element);
             } else {
                 // Если в текущем чате нет персонажа - загружаем персонажа в текущий чат
                 clearSelections();
@@ -1124,6 +1169,40 @@
                 selectedSaveFile = null;
                 loadCharacterAndStartGame(filename, name);
             }
+        }
+
+        function showCharacterChangeModal(filename, name, element) {
+            const modal = document.getElementById('characterChangeModal');
+            const message = document.getElementById('characterChangeMessage');
+            message.textContent = `В текущем чате уже выбран персонаж. Создать новый чат с персонажем "${name}"?`;
+            
+            modal.style.display = 'block';
+            
+            // Сохраняем данные для обработки
+            modal.dataset.filename = filename;
+            modal.dataset.name = name;
+            modal.dataset.elementIndex = Array.from(element.parentNode.children).indexOf(element);
+        }
+
+        function confirmCharacterChange() {
+            const modal = document.getElementById('characterChangeModal');
+            const filename = modal.dataset.filename;
+            const name = modal.dataset.name;
+            const elementIndex = parseInt(modal.dataset.elementIndex);
+            const element = document.getElementById('characters-list').children[elementIndex];
+            
+            clearSelections();
+            element.classList.add('selected');
+            selectedCharacterFile = filename;
+            selectedSaveFile = null;
+            updateSelectedCharacterIndicator(name);
+            createNewChat(); // Создастся с выбранным персонажем (вариант 1)
+            
+            closeCharacterChangeModal();
+        }
+
+        function closeCharacterChangeModal() {
+            document.getElementById('characterChangeModal').style.display = 'none';
         }
 
         function selectSave(filename, element) {
@@ -1651,9 +1730,14 @@
 
         // Закрываем модальные окна по клику вне их
         window.onclick = function(event) {
-            const modal = document.getElementById('fileUploadModal');
-            if (event.target === modal) {
+            const fileModal = document.getElementById('fileUploadModal');
+            const charModal = document.getElementById('characterChangeModal');
+            
+            if (event.target === fileModal) {
                 closeFileUploadModal();
+            }
+            if (event.target === charModal) {
+                closeCharacterChangeModal();
             }
         }
 
