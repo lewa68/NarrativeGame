@@ -21,10 +21,10 @@ MODEL = "mistral-large-latest"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 
-# Глобальная конфигурация контекста
+# Глобальная конфигурация контекста (только в коде)
 CONTEXT_CONFIG = {
-    "max_messages": 500,
-    "max_tokens": 1280000,
+    "max_messages": 50,
+    "max_tokens": 128000,
     "summary_enabled": True,
     "context_size": "medium"
 }
@@ -679,64 +679,7 @@ def start_game():
 
 
 
-@app.route('/get_context_config', methods=['GET'])
-@login_required
-def get_context_config():
-    """Получает текущие настройки контекста"""
-    return jsonify({
-        "success": True,
-        "config": CONTEXT_CONFIG
-    })
 
-
-@app.route('/update_context_config', methods=['POST'])
-@login_required  
-def update_context_config():
-    """Обновляет настройки контекста"""
-    data = request.get_json()
-    
-    if 'max_messages' in data:
-        try:
-            max_messages = int(data['max_messages'])
-            if 1 <= max_messages <= 500:  # Разумные ограничения
-                CONTEXT_CONFIG['max_messages'] = max_messages
-            else:
-                return jsonify({"error": "max_messages должно быть от 1 до 500"})
-        except ValueError:
-            return jsonify({"error": "max_messages должно быть числом"})
-    
-    if 'max_tokens' in data:
-        try:
-            max_tokens = int(data['max_tokens'])
-            if 1000 <= max_tokens <= 300000:  # Ограничения API
-                CONTEXT_CONFIG['max_tokens'] = max_tokens
-            else:
-                return jsonify({"error": "max_tokens должно быть от 1000 до 300000"})
-        except ValueError:
-            return jsonify({"error": "max_tokens должно быть числом"})
-    
-    if 'summary_enabled' in data:
-        CONTEXT_CONFIG['summary_enabled'] = bool(data['summary_enabled'])
-    
-    if 'context_size' in data:
-        size = data['context_size']
-        if size in ['small', 'medium', 'large', 'xlarge']:
-            CONTEXT_CONFIG['context_size'] = size
-            # Применяем предустановку
-            context_manager = ContextManager()
-            context_manager.set_context_size(size)
-            CONTEXT_CONFIG['max_messages'] = context_manager.max_messages
-            CONTEXT_CONFIG['max_tokens'] = context_manager.max_tokens
-        else:
-            return jsonify({"error": "Неизвестный размер контекста"})
-    
-    logger.info(f"Обновлены настройки контекста: {CONTEXT_CONFIG}")
-    
-    return jsonify({
-        "success": True,
-        "message": "Настройки контекста обновлены",
-        "config": CONTEXT_CONFIG
-    })
 
     return jsonify({"response": response, "game_started": bool(character)})
 

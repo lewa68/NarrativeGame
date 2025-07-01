@@ -551,6 +551,10 @@
 
         /* Адаптивность */
         @media (max-width: 768px) {
+            .sidebar-toggle {
+                display: none;
+            }
+
             .sidebar {
                 width: 280px;
                 position: fixed;
@@ -639,6 +643,51 @@
             display: none;
         }
 
+        .sidebar-toggle {
+            position: fixed;
+            top: 50%;
+            left: 300px;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 0 15px 15px 0;
+            width: 40px;
+            height: 80px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar-toggle:hover {
+            background: linear-gradient(135deg, #5a6fd8, #6a42a6);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+            transform: translateY(-50%) translateX(5px);
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-toggle.collapsed {
+            left: 0;
+            border-radius: 0 15px 15px 0;
+        }
+
+        .game-area.expanded {
+            margin-left: 0;
+        }
+
+        .input-area.expanded {
+            left: 0;
+        }
+
         .overlay {
             display: none;
             position: fixed;
@@ -695,6 +744,7 @@
             gap: 12px;
             border-top: 1px solid rgba(255,255,255,0.2);
             z-index: 10;
+            transition: left 0.3s ease;
         }
     </style>
 </head>
@@ -713,6 +763,9 @@
     <div class="overlay" onclick="closeSidebar()"></div>
 
     <div class="main-container">
+        <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebarCollapse()">
+            ◀
+        </button>
         <div class="sidebar" id="sidebar">
             <div class="sidebar-scrollable">
                 <!-- Чаты -->
@@ -751,36 +804,7 @@
                     <button class="action-btn" onclick="saveGame()">💾 Сохранить</button>
                 </div>
 
-                <!-- Настройки контекста -->
-                <div class="sidebar-section">
-                    <h3>🧠 Память ИИ</h3>
-                    <div style="font-size: 0.8em; margin-bottom: 10px; opacity: 0.8;">
-                        <div>Сообщений: <span id="current-messages">50</span></div>
-                        <div>Токенов: <span id="current-tokens">128000</span></div>
-                    </div>
-                    
-                    <select id="context-size-select" class="small-input" onchange="setContextSize()">
-                        <option value="small">Малый (20 сообщений)</option>
-                        <option value="medium" selected>Средний (50 сообщений)</option>
-                        <option value="large">Большой (100 сообщений)</option>
-                        <option value="xlarge">Очень большой (200 сообщений)</option>
-                    </select>
-                    
-                    <div style="margin-top: 8px;">
-                        <input type="number" id="custom-messages-input" class="small-input" 
-                               placeholder="Кастомное количество" min="1" max="500" 
-                               style="font-size: 0.8em;">
-                        <button class="action-btn" onclick="setCustomContext()" 
-                                style="font-size: 0.8em;">Применить</button>
-                    </div>
-                    
-                    <div style="margin-top: 8px; font-size: 0.8em;">
-                        <label style="display: flex; align-items: center; gap: 5px;">
-                            <input type="checkbox" id="summary-enabled" checked onchange="updateSummaryEnabled()">
-                            Создавать резюме
-                        </label>
-                    </div>
-                </div>
+                
             </div>
         </div>
 
@@ -881,7 +905,6 @@
             loadChats();
             loadCharacters();
             loadSaves();
-            loadContextConfig();
         };
 
         function loadUserInfo() {
@@ -1199,97 +1222,7 @@
                 }
 
 
-        // Функции управления контекстом
-        function loadContextConfig() {
-            fetch('/get_context_config')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const config = data.config;
-                    document.getElementById('current-messages').textContent = config.max_messages;
-                    document.getElementById('current-tokens').textContent = config.max_tokens;
-                    document.getElementById('context-size-select').value = config.context_size;
-                    document.getElementById('summary-enabled').checked = config.summary_enabled;
-                }
-            })
-            .catch(error => {
-                console.error('Ошибка загрузки настроек контекста:', error);
-            });
-        }
-
-        function setContextSize() {
-            const size = document.getElementById('context-size-select').value;
-            
-            fetch('/update_context_config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ context_size: size })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const config = data.config;
-                    document.getElementById('current-messages').textContent = config.max_messages;
-                    document.getElementById('current-tokens').textContent = config.max_tokens;
-                    showNotification(`Размер контекста изменен: ${config.max_messages} сообщений`, 'success');
-                } else {
-                    showNotification(data.error, 'error');
-                }
-            })
-            .catch(error => {
-                showNotification('Ошибка обновления контекста: ' + error.message, 'error');
-            });
-        }
-
-        function setCustomContext() {
-            const maxMessages = parseInt(document.getElementById('custom-messages-input').value);
-            
-            if (!maxMessages || maxMessages < 1 || maxMessages > 500) {
-                showNotification('Введите число от 1 до 500', 'error');
-                return;
-            }
-            
-            fetch('/update_context_config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ max_messages: maxMessages })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const config = data.config;
-                    document.getElementById('current-messages').textContent = config.max_messages;
-                    document.getElementById('custom-messages-input').value = '';
-                    showNotification(`Установлено ${config.max_messages} сообщений в контексте`, 'success');
-                } else {
-                    showNotification(data.error, 'error');
-                }
-            })
-            .catch(error => {
-                showNotification('Ошибка установки контекста: ' + error.message, 'error');
-            });
-        }
-
-        function updateSummaryEnabled() {
-            const enabled = document.getElementById('summary-enabled').checked;
-            
-            fetch('/update_context_config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ summary_enabled: enabled })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification(enabled ? 'Резюме включено' : 'Резюме отключено', 'success');
-                } else {
-                    showNotification(data.error, 'error');
-                }
-            })
-            .catch(error => {
-                showNotification('Ошибка обновления настроек: ' + error.message, 'error');
-            });
-        }
+        
 
             })
             .catch(error => {
@@ -2016,6 +1949,26 @@
         window.addEventListener('focus', function() {
             setTimeout(hideLoading, 50);
         });
+
+        // Функция переключения сайдбара
+        function toggleSidebarCollapse() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('sidebarToggle');
+            const gameArea = document.querySelector('.game-area');
+            const inputArea = document.querySelector('.input-area');
+            
+            sidebar.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            gameArea.classList.toggle('expanded');
+            inputArea.classList.toggle('expanded');
+            
+            // Меняем символ на кнопке
+            if (sidebar.classList.contains('collapsed')) {
+                toggleBtn.textContent = '▶';
+            } else {
+                toggleBtn.textContent = '◀';
+            }
+        }
     </script>
 </body>
 </html>
