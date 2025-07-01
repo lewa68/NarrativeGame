@@ -991,6 +991,7 @@
             }
 
             clearMessages();
+            hideLoading(); // Убираем старые индикаторы загрузки при переключении чата
 
             // Получаем персонажа через ID
             const character_id = chatData.character_id;
@@ -1496,10 +1497,11 @@
         }
 
         function hideLoading() {
-            const loading = document.getElementById('loading');
-            if (loading) {
+            // Удаляем все элементы загрузки (может быть несколько)
+            const loadingElements = document.querySelectorAll('.loading');
+            loadingElements.forEach(loading => {
                 loading.remove();
-            }
+            });
         }
 
         function showError(message) {
