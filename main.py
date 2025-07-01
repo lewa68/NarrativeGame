@@ -336,7 +336,7 @@ def get_characters():
 @app.route('/get_chats', methods=['GET'])
 @login_required
 def get_chats():
-    """Получает список чатов пользователя"""
+    """Получает список чатов пользователя с информацией о персонажах"""
     user_folder = get_user_folder(session['username'], session['user_id'])
     chats_folder = os.path.join(user_folder, "chats")
 
@@ -350,7 +350,14 @@ def get_chats():
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
                     chat_data = json.load(f)
+                
                 chat_id = filename[:-5]  # убираем .json
+                
+                # Добавляем информацию о персонаже для UI
+                character_desc, character_name = get_chat_character(chat_data)
+                if character_name:
+                    chat_data['character_name'] = character_name
+                
                 chats[chat_id] = chat_data
             except:
                 continue
@@ -360,8 +367,7 @@ def get_chats():
         default_chat = {
             "name": "Основной чат",
             "messages": [],
-            "character": None,
-            "character_name": None,
+            "character_id": None,
             "created_at": datetime.now().isoformat()
         }
         chats['default'] = default_chat
@@ -535,7 +541,7 @@ def send_message():
 
     # Проверяем персонажа в чате
     chat_data = load_chat_data(chat_id)
-    chat_character = chat_data.get('character') if chat_data else None
+    chat_character, chat_character_name = get_chat_character(chat_data)
     
     logger.debug(f"Проверка персонажа в чате: {bool(chat_character)}")
 
@@ -683,14 +689,16 @@ def create_character_continue(user_input, chat_id='default'):
             session['character_creation_mode'] = False
             session.pop('character_creation_history', None)
 
-            # Сохраняем персонажа
-            save_character_to_file(character_description)
+            # Сохраняем персонажа и получаем его ID
+            character_id = save_character_to_file(character_description, character_name)
 
-            # Обновляем чат с персонажем
+            # Обновляем чат с ID персонажа
             chat_data = load_chat_data(chat_id)
             if chat_data:
-                chat_data['character'] = character_description
-                chat_data['character_name'] = character_name
+                chat_data['character_id'] = character_id
+                # Удаляем старые поля
+                chat_data.pop('character', None)
+                chat_data.pop('character_name', None)
                 save_chat_file(chat_id, chat_data)
 
             # Сохраняем в чат
@@ -753,16 +761,55 @@ def save_character_to_file(character_description, character_name=None):
         with open(os.path.join(characters_folder, filename), 'w', encoding='utf-8') as f:
             json.dump(character_data, f, ensure_ascii=False, indent=2)
 
-        return filename[:-5]  # Возвращаем имя без .json
+        return character_id  # Возвращаем ID персонажа
 
     except Exception as e:
         print(f"Ошибка сохранения персонажа: {e}")
         return None
 
+def get_character_by_id(character_id):
+    """Загружает персонажа по ID из файла"""
+    try:
+        user_folder = get_user_folder(session['username'], session['user_id'])
+        characters_folder = os.path.join(user_folder, "characters")
+        
+        # Ищем файл с нужным ID
+        for filename in os.listdir(characters_folder):
+            if filename.endswith('.json'):
+                filepath = os.path.join(characters_folder, filename)
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    char_data = json.load(f)
+                
+                if char_data.get('id') == character_id:
+                    return char_data
+        
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка загрузки персонажа по ID {character_id}: {e}")
+        return None
+
+def get_chat_character(chat_data):
+    """Получает полные данные персонажа для чата"""
+    if not chat_data:
+        return None, None
+    
+    character_id = chat_data.get('character_id')
+    if not character_id:
+        # Для обратной совместимости со старыми чатами
+        old_character = chat_data.get('character')
+        old_name = chat_data.get('character_name')
+        return old_character, old_name
+    
+    char_data = get_character_by_id(character_id)
+    if char_data:
+        return char_data['description'], char_data['name']
+    
+    return None, None
+
 @app.route('/load_character', methods=['POST'])
 @login_required
 def load_character():
-    """Загружает персонажа из сохраненных и сохраняет в чат"""
+    """Загружает персонажа из сохраненных и сохраняет ID в чат"""
     data = request.get_json()
     filename = data.get('filename')
     chat_id = data.get('chat_id', 'default')
@@ -775,7 +822,7 @@ def load_character():
 
     # Проверяем, есть ли уже персонаж в текущем чате
     chat_data = load_chat_data(chat_id)
-    if chat_data and chat_data.get('character'):
+    if chat_data and chat_data.get('character_id'):
         logger.warning(f"Персонаж уже выбран для чата {chat_id}")
         return jsonify({"error": "Персонаж для этой истории уже выбран"})
 
@@ -786,24 +833,25 @@ def load_character():
         with open(filepath, 'r', encoding='utf-8') as f:
             character_data = json.load(f)
 
-        # Используем имя из файла
+        character_id = character_data.get('id')
         character_name = character_data.get('name', filename)
         character_description = character_data['description']
 
-        logger.debug(f"Загружен персонаж: {character_name}")
+        logger.debug(f"Загружен персонаж: {character_name} (ID: {character_id})")
 
-        # Сохраняем персонажа в чат (НЕ в сессию)
+        # Сохраняем только ID персонажа в чат
         if not chat_data:
             chat_data = {
                 "name": f"Чат {character_name}",
                 "messages": [],
-                "character": character_description,
-                "character_name": character_name,
+                "character_id": character_id,
                 "created_at": datetime.now().isoformat()
             }
         else:
-            chat_data['character'] = character_description
-            chat_data['character_name'] = character_name
+            chat_data['character_id'] = character_id
+            # Удаляем старые поля для совместимости
+            chat_data.pop('character', None)
+            chat_data.pop('character_name', None)
 
         save_chat_file(chat_id, chat_data)
 
@@ -812,7 +860,7 @@ def load_character():
         system_prompt = create_gm_system_prompt(rules)
         session['system_prompt'] = system_prompt
 
-        logger.info(f"Персонаж '{character_name}' успешно сохранен в чат {chat_id}")
+        logger.info(f"Персонаж '{character_name}' (ID: {character_id}) успешно привязан к чату {chat_id}")
 
         return jsonify({
             "success": True,
@@ -851,12 +899,11 @@ def start_game_with_character():
 
     # Загружаем данные чата для проверки персонажа
     chat_data = load_chat_data(chat_id)
-    if not chat_data or not chat_data.get('character'):
+    character, character_name = get_chat_character(chat_data)
+    
+    if not character:
         logger.error(f"Персонаж не найден в чате {chat_id}")
         return jsonify({"error": "Персонаж не выбран"})
-
-    character = chat_data['character']
-    character_name = chat_data.get('character_name', 'Персонаж')
     
     logger.info(f"Начинаем игру с персонажем: {character_name}")
     
