@@ -67,52 +67,142 @@ def login_required(f):
 
 
 class ContextManager:
-
-    def __init__(self, max_tokens=8000, summary_threshold=15):
+    def __init__(self, max_messages=50, max_tokens=128000, summary_enabled=True):
+        """
+        Инициализация менеджера контекста
+        
+        Args:
+            max_messages: Максимальное количество сообщений в контексте (по умолчанию 50)
+            max_tokens: Максимальное количество токенов (по умолчанию 128000 для Mistral Large)
+            summary_enabled: Включить ли создание резюме при превышении лимитов
+        """
+        self.max_messages = max_messages
         self.max_tokens = max_tokens
-        self.summary_threshold = summary_threshold
+        self.summary_enabled = summary_enabled
+        
+        # Настраиваемые параметры для разных размеров контекста
+        self.context_configs = {
+            "small": {"max_messages": 20, "max_tokens": 32000},
+            "medium": {"max_messages": 50, "max_tokens": 64000}, 
+            "large": {"max_messages": 100, "max_tokens": 128000},
+            "xlarge": {"max_messages": 200, "max_tokens": 200000}
+        }
+    
+    def set_context_size(self, size="medium"):
+        """Устанавливает размер контекста по предустановке"""
+        if size in self.context_configs:
+            config = self.context_configs[size]
+            self.max_messages = config["max_messages"]
+            self.max_tokens = config["max_tokens"]
+            logger.info(f"Установлен размер контекста: {size} ({self.max_messages} сообщений, {self.max_tokens} токенов)")
+        else:
+            logger.warning(f"Неизвестный размер контекста: {size}")
+    
+    def set_custom_context(self, max_messages, max_tokens=None):
+        """Устанавливает кастомные параметры контекста"""
+        self.max_messages = max_messages
+        if max_tokens:
+            self.max_tokens = max_tokens
+        logger.info(f"Установлен кастомный контекст: {self.max_messages} сообщений, {self.max_tokens} токенов")
 
     def estimate_tokens(self, text):
-        """Примерная оценка количества токенов (1 токен ≈ 4 символа для русского)"""
-        return len(text) // 3
+        """Улучшенная оценка количества токенов (1 токен ≈ 3.5 символа для русского)"""
+        return int(len(text) / 3.5)
 
-    def create_summary(self, messages):
-        """Создает краткое резюме старых сообщений"""
-        summary_messages = []
+    def create_detailed_summary(self, messages):
+        """Создает подробное резюме важных событий"""
+        if not messages:
+            return None
+            
+        # Группируем сообщения по блокам диалога
+        summary_parts = []
+        current_block = []
+        
+        for msg in messages:
+            current_block.append(msg)
+            
+            # Каждые 4-6 сообщений создаем блок
+            if len(current_block) >= 4:
+                block_summary = self._summarize_block(current_block)
+                if block_summary:
+                    summary_parts.append(block_summary)
+                current_block = []
+        
+        # Обрабатываем остатки
+        if current_block:
+            block_summary = self._summarize_block(current_block)
+            if block_summary:
+                summary_parts.append(block_summary)
+        
+        if summary_parts:
+            return {
+                "role": "system",
+                "content": f"📜 РЕЗЮМЕ ПРЕДЫДУЩИХ СОБЫТИЙ:\n\n" + "\n\n".join(summary_parts)
+            }
+        return None
+    
+    def _summarize_block(self, messages):
+        """Создает резюме блока сообщений"""
+        if not messages:
+            return ""
+            
+        summary_lines = []
         for msg in messages:
             if msg["role"] == "user":
-                summary_messages.append(f"Игрок: {msg['content'][:100]}...")
+                # Для игрока берем полное действие если оно короткое, иначе сокращаем
+                content = msg["content"]
+                if len(content) <= 150:
+                    summary_lines.append(f"🎮 Игрок: {content}")
+                else:
+                    summary_lines.append(f"🎮 Игрок: {content[:120]}...")
             else:
-                summary_messages.append(f"ГМ: {msg['content'][:200]}...")
-
-        return {
-            "role":
-            "system",
-            "content":
-            f"РЕЗЮМЕ ПРЕДЫДУЩИХ СОБЫТИЙ:\n" + "\n".join(summary_messages[-5:])
-        }
+                # Для ГМ берем ключевые моменты
+                content = msg["content"]
+                if len(content) <= 200:
+                    summary_lines.append(f"🎲 ГМ: {content}")
+                else:
+                    # Пытаемся найти ключевые предложения
+                    sentences = content.split('.')
+                    key_sentences = [s.strip() for s in sentences[:2] if s.strip()]
+                    if key_sentences:
+                        summary_lines.append(f"🎲 ГМ: {'. '.join(key_sentences)}...")
+                    else:
+                        summary_lines.append(f"🎲 ГМ: {content[:180]}...")
+        
+        return "\n".join(summary_lines)
 
     def optimize_context(self, conversation_history):
-        """Оптимизирует контекст, балансируя полноту и размер"""
-        if len(conversation_history) <= 6:
-            return conversation_history
-
-        total_tokens = sum(
-            self.estimate_tokens(msg["content"])
-            for msg in conversation_history)
-
-        if total_tokens <= self.max_tokens:
-            return conversation_history
-
-        # Сохраняем последние важные сообщения
-        recent_messages = conversation_history[-8:]
-        older_messages = conversation_history[:-8]
-
+        """Оптимизирует контекст с учетом настраиваемых параметров"""
+        if not conversation_history:
+            return []
+        
+        # Если сообщений меньше лимита - возвращаем как есть
+        if len(conversation_history) <= self.max_messages:
+            total_tokens = sum(self.estimate_tokens(msg["content"]) for msg in conversation_history)
+            if total_tokens <= self.max_tokens:
+                logger.debug(f"Контекст в норме: {len(conversation_history)} сообщений, ~{total_tokens} токенов")
+                return conversation_history
+        
+        logger.info(f"Оптимизация контекста: {len(conversation_history)} сообщений -> {self.max_messages}")
+        
+        # Если резюме отключено - просто обрезаем
+        if not self.summary_enabled:
+            return conversation_history[-self.max_messages:]
+        
+        # Стратегия с резюме: оставляем 70% от лимита для новых сообщений
+        keep_recent = int(self.max_messages * 0.7)
+        recent_messages = conversation_history[-keep_recent:]
+        older_messages = conversation_history[:-keep_recent]
+        
         # Создаем резюме старых сообщений
         if older_messages:
-            summary = self.create_summary(older_messages)
-            return [summary] + recent_messages
-
+            summary = self.create_detailed_summary(older_messages)
+            if summary:
+                result = [summary] + recent_messages
+                total_tokens = sum(self.estimate_tokens(msg["content"]) for msg in result)
+                logger.info(f"Контекст оптимизирован: {len(result)} сообщений (~{total_tokens} токенов)")
+                return result
+        
         return recent_messages
 
 
@@ -191,17 +281,27 @@ def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
     try:
         client = Mistral(api_key=API_KEY)
 
+        # Создаем менеджер контекста с текущими настройками
+        context_manager = ContextManager(
+            max_messages=CONTEXT_CONFIG["max_messages"],
+            max_tokens=CONTEXT_CONFIG["max_tokens"], 
+            summary_enabled=CONTEXT_CONFIG["summary_enabled"]
+        )
+        
         # Оптимизируем контекст
-        context_manager = ContextManager()
-        optimized_history = context_manager.optimize_context(
-            conversation_history)
-
+        optimized_history = context_manager.optimize_context(conversation_history)
+        
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
 
         messages.extend(optimized_history)
         messages.append({"role": "user", "content": prompt})
+        
+        # Логируем информацию о контексте для отладки
+        total_messages = len(messages)
+        estimated_tokens = sum(context_manager.estimate_tokens(msg["content"]) for msg in messages)
+        logger.debug(f"Отправка в API: {total_messages} сообщений, ~{estimated_tokens} токенов")
 
         chat_response = client.chat.complete(model=MODEL, messages=messages)
 
@@ -566,6 +666,67 @@ def start_game():
             "content": response,
             "timestamp": datetime.now().isoformat()
         }])
+
+
+
+@app.route('/get_context_config', methods=['GET'])
+@login_required
+def get_context_config():
+    """Получает текущие настройки контекста"""
+    return jsonify({
+        "success": True,
+        "config": CONTEXT_CONFIG
+    })
+
+
+@app.route('/update_context_config', methods=['POST'])
+@login_required  
+def update_context_config():
+    """Обновляет настройки контекста"""
+    data = request.get_json()
+    
+    if 'max_messages' in data:
+        try:
+            max_messages = int(data['max_messages'])
+            if 1 <= max_messages <= 500:  # Разумные ограничения
+                CONTEXT_CONFIG['max_messages'] = max_messages
+            else:
+                return jsonify({"error": "max_messages должно быть от 1 до 500"})
+        except ValueError:
+            return jsonify({"error": "max_messages должно быть числом"})
+    
+    if 'max_tokens' in data:
+        try:
+            max_tokens = int(data['max_tokens'])
+            if 1000 <= max_tokens <= 300000:  # Ограничения API
+                CONTEXT_CONFIG['max_tokens'] = max_tokens
+            else:
+                return jsonify({"error": "max_tokens должно быть от 1000 до 300000"})
+        except ValueError:
+            return jsonify({"error": "max_tokens должно быть числом"})
+    
+    if 'summary_enabled' in data:
+        CONTEXT_CONFIG['summary_enabled'] = bool(data['summary_enabled'])
+    
+    if 'context_size' in data:
+        size = data['context_size']
+        if size in ['small', 'medium', 'large', 'xlarge']:
+            CONTEXT_CONFIG['context_size'] = size
+            # Применяем предустановку
+            context_manager = ContextManager()
+            context_manager.set_context_size(size)
+            CONTEXT_CONFIG['max_messages'] = context_manager.max_messages
+            CONTEXT_CONFIG['max_tokens'] = context_manager.max_tokens
+        else:
+            return jsonify({"error": "Неизвестный размер контекста"})
+    
+    logger.info(f"Обновлены настройки контекста: {CONTEXT_CONFIG}")
+    
+    return jsonify({
+        "success": True,
+        "message": "Настройки контекста обновлены",
+        "config": CONTEXT_CONFIG
+    })
 
     return jsonify({"response": response, "game_started": bool(character)})
 
