@@ -1078,7 +1078,8 @@
             selectedCharacterFile = filename;
             selectedSaveFile = null;
 
-            loadCharacterOnly(filename);
+            // Автоматически начинаем игру с выбранным персонажем
+            loadCharacterAndStartGame(filename);
         }
 
         function selectSave(filename, element) {
@@ -1127,6 +1128,74 @@
             .catch(error => {
                 hideLoading();
                 showNotification('Ошибка загрузки персонажа: ' + error.message, 'error');
+            });
+        }
+
+        function loadCharacterAndStartGame(filename) {
+            showLoading();
+            hideStartScreen(); // Сразу показываем чат
+
+            fetch('/load_character', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: filename,
+                    chat_id: currentChatId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentCharacter = data.character;
+                    currentCharacterName = data.character_name;
+
+                    updateCurrentCharacterDisplay();
+                    updateStartButton();
+
+                    // Автоматически начинаем игру
+                    return fetch('/start_game_with_character', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: currentChatId
+                        })
+                    });
+                } else {
+                    hideLoading();
+                    showStartScreen(); // Возвращаем стартовый экран при ошибке
+                    showNotification(data.error, 'error');
+                    throw new Error(data.error);
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    // Обновляем данные чата
+                    chatsData[currentChatId] = {
+                        name: data.chat_name,
+                        messages: [
+                            {role: 'user', content: 'Начни игру'},
+                            {role: 'assistant', content: data.response}
+                        ],
+                        character: currentCharacter,
+                        character_name: currentCharacterName
+                    };
+
+                    updateChatsUI();
+                    clearMessages();
+                    addMessage('gm', data.response);
+
+                    showNotification(`Игра началась с персонажем ${currentCharacterName}!`, 'success');
+                } else {
+                    showStartScreen(); // Возвращаем стартовый экран при ошибке
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showStartScreen(); // Возвращаем стартовый экран при ошибке
+                showNotification('Ошибка начала игры: ' + error.message, 'error');
             });
         }
 
