@@ -895,22 +895,38 @@
 
         function loadChatMessages(chatId) {
             const chatData = chatsData[chatId];
-            if (!chatData) return;
-
-            clearMessages();
-
-            if (chatData.character) {
-                currentCharacter = chatData.character;
-                currentCharacterName = chatData.character_name || 'Персонаж';
-                updateCurrentCharacterDisplay();
-            } else {
+            if (!chatData) {
+                // Создаем пустой чат если его нет
+                chatsData[chatId] = {
+                    name: 'Новый чат',
+                    messages: [],
+                    character: null,
+                    character_name: null
+                };
+                clearMessages();
                 currentCharacter = null;
                 currentCharacterName = null;
                 updateCurrentCharacterDisplay();
+                updateStartButton();
+                showStartScreen();
+                return;
             }
 
+            clearMessages();
+
+            // Устанавливаем текущего персонажа из данных чата
+            if (chatData.character) {
+                currentCharacter = chatData.character;
+                currentCharacterName = chatData.character_name || 'Персонаж';
+            } else {
+                currentCharacter = null;
+                currentCharacterName = null;
+            }
+
+            updateCurrentCharacterDisplay();
             updateStartButton();
 
+            // Загружаем сообщения если они есть
             if (chatData.messages && chatData.messages.length > 0) {
                 chatData.messages.forEach(msg => {
                     if (msg.role === 'user') {
@@ -1071,8 +1087,9 @@
         }
 
         function selectCharacter(filename, name, element) {
-            if (currentCharacter && chatsData[currentChatId] && chatsData[currentChatId].character) {
-                showNotification('Персонаж для этой истории уже выбран', 'error');
+            // Проверяем, есть ли уже персонаж в текущем чате
+            if (chatsData[currentChatId] && chatsData[currentChatId].character) {
+                showNotification('Персонаж для этого чата уже выбран', 'error');
                 return;
             }
 
@@ -1083,7 +1100,7 @@
             selectedSaveFile = null;
 
             // Автоматически начинаем игру с выбранным персонажем
-            loadCharacterAndStartGame(filename);
+            loadCharacterAndStartGame(filename, name);
         }
 
         function selectSave(filename, element) {
@@ -1135,7 +1152,7 @@
             });
         }
 
-        function loadCharacterAndStartGame(filename) {
+        function loadCharacterAndStartGame(filename, characterName) {
             showLoading();
             hideStartScreen(); // Сразу показываем чат
 
@@ -1151,7 +1168,20 @@
             .then(data => {
                 if (data.success) {
                     currentCharacter = data.character;
-                    currentCharacterName = data.character_name;
+                    currentCharacterName = data.character_name || characterName;
+
+                    // Обновляем данные чата с персонажем
+                    if (!chatsData[currentChatId]) {
+                        chatsData[currentChatId] = {
+                            name: `Чат ${currentCharacterName}`,
+                            messages: [],
+                            character: currentCharacter,
+                            character_name: currentCharacterName
+                        };
+                    } else {
+                        chatsData[currentChatId].character = currentCharacter;
+                        chatsData[currentChatId].character_name = currentCharacterName;
+                    }
 
                     updateCurrentCharacterDisplay();
                     updateStartButton();
@@ -1166,7 +1196,7 @@
                     });
                 } else {
                     hideLoading();
-                    showStartScreen(); // Возвращаем стартовый экран при ошибке
+                    showStartScreen();
                     showNotification(data.error, 'error');
                     throw new Error(data.error);
                 }
@@ -1175,16 +1205,15 @@
             .then(data => {
                 hideLoading();
                 if (data.success) {
-                    // Обновляем данные чата
-                    chatsData[currentChatId] = {
-                        name: data.chat_name,
-                        messages: [
-                            {role: 'user', content: 'Начни игру'},
-                            {role: 'assistant', content: data.response}
-                        ],
-                        character: currentCharacter,
-                        character_name: currentCharacterName
-                    };
+                    // Добавляем сообщения в чат
+                    if (!chatsData[currentChatId].messages) {
+                        chatsData[currentChatId].messages = [];
+                    }
+                    
+                    chatsData[currentChatId].messages.push(
+                        {role: 'user', content: 'Начни игру'},
+                        {role: 'assistant', content: data.response}
+                    );
 
                     updateChatsUI();
                     clearMessages();
@@ -1192,13 +1221,13 @@
 
                     showNotification(`Игра началась с персонажем ${currentCharacterName}!`, 'success');
                 } else {
-                    showStartScreen(); // Возвращаем стартовый экран при ошибке
+                    showStartScreen();
                     showNotification(data.error, 'error');
                 }
             })
             .catch(error => {
                 hideLoading();
-                showStartScreen(); // Возвращаем стартовый экран при ошибке
+                showStartScreen();
                 showNotification('Ошибка начала игры: ' + error.message, 'error');
             });
         }
@@ -1223,15 +1252,19 @@
                 hideLoading();
                 if (data.success) {
                     // Обновляем данные чата
-                    chatsData[currentChatId] = {
-                        name: data.chat_name,
-                        messages: [
-                            {role: 'user', content: 'Начни игру'},
-                            {role: 'assistant', content: data.response}
-                        ],
-                        character: currentCharacter,
-                        character_name: currentCharacterName
-                    };
+                    if (!chatsData[currentChatId]) {
+                        chatsData[currentChatId] = {
+                            name: data.chat_name || `Чат ${currentCharacterName}`,
+                            messages: [],
+                            character: currentCharacter,
+                            character_name: currentCharacterName
+                        };
+                    }
+
+                    chatsData[currentChatId].messages = [
+                        {role: 'user', content: 'Начни игру'},
+                        {role: 'assistant', content: data.response}
+                    ];
 
                     updateChatsUI();
                     hideStartScreen();
