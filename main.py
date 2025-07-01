@@ -21,6 +21,14 @@ MODEL = "mistral-large-latest"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 
+# Глобальная конфигурация контекста
+CONTEXT_CONFIG = {
+    "max_messages": 50,
+    "max_tokens": 128000,
+    "summary_enabled": True,
+    "context_size": "medium"
+}
+
 
 # Инициализация базы данных
 def init_db():
@@ -666,6 +674,8 @@ def start_game():
             "content": response,
             "timestamp": datetime.now().isoformat()
         }])
+
+    return jsonify({"response": response, "game_started": bool(character)})
 
 
 
