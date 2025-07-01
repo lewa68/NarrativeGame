@@ -908,10 +908,7 @@
             }
         }
 
-        function updateStartButton() {
-            // Эта функция была вызывается, но не была определена
-            // Пока оставляем пустой, так как логика стартового экрана работает через другие функции
-        }
+        
 
         function switchToChat(chatId) {
             if (chatId === currentChatId) return;
@@ -1196,8 +1193,10 @@
 
         function loadCharacterAndStartGame(filename, characterName) {
             console.log('Начинаем загрузку персонажа:', filename, 'для чата:', currentChatId);
+            
+            // Сразу скрываем стартовый экран и показываем чат
+            hideStartScreen();
             showLoading();
-            hideStartScreen(); // Сразу показываем чат
 
             fetch('/load_character', {
                 method: 'POST',
