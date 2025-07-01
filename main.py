@@ -979,7 +979,12 @@ def save_game():
     }
 
     user_folder = get_user_folder(session['username'], session['user_id'])
-    save_path = os.path.join(user_folder, "saves", f"{save_name}.json")
+    saves_folder = os.path.join(user_folder, "saves")
+    
+    # Создаем папку saves если она не существует
+    os.makedirs(saves_folder, exist_ok=True)
+    
+    save_path = os.path.join(saves_folder, f"{save_name}.json")
 
     try:
         with open(save_path, "w", encoding="utf-8") as f:

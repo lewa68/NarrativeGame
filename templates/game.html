@@ -541,6 +541,11 @@
             color: white;
         }
 
+        .modal-btn.danger {
+            background: linear-gradient(135deg, #ff4757, #ff3838);
+            color: white;
+        }
+
         .modal-btn:hover {
             transform: translateY(-1px);
         }
@@ -812,6 +817,19 @@
         </div>
     </div>
 
+    <!-- Модальное окно подтверждения удаления -->
+    <div id="confirmDeleteModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeConfirmDeleteModal()">&times;</span>
+            <h3 id="confirmDeleteTitle">🗑️ Подтверждение удаления</h3>
+            <p id="confirmDeleteMessage" style="margin-bottom: 25px; line-height: 1.5;"></p>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeConfirmDeleteModal()">Отмена</button>
+                <button class="modal-btn danger" onclick="confirmDelete()" id="confirmDeleteBtn">Удалить</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Уведомления -->
     <div id="notification-container"></div>
 
@@ -1064,6 +1082,8 @@
 
         
 
+        let pendingDeleteAction = null;
+
         function deleteChat(chatId, event) {
             event.stopPropagation();
 
@@ -1072,34 +1092,39 @@
                 return;
             }
 
-            if (!confirm('Удалить этот чат?')) return;
-
-            fetch('/delete_chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({chat_id: chatId})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    delete chatsData[chatId];
-                    
-                    if (chatId === currentChatId) {
-                        const remainingChats = Object.keys(chatsData);
-                        if (remainingChats.length > 0) {
-                            switchToChat(remainingChats[0]);
+            const chatName = chatsData[chatId]?.name || chatId;
+            showConfirmDelete(
+                'Удаление чата',
+                `Вы уверены, что хотите удалить чат "${chatName}"? Это действие нельзя отменить.`,
+                () => {
+                    fetch('/delete_chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({chat_id: chatId})
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            delete chatsData[chatId];
+                            
+                            if (chatId === currentChatId) {
+                                const remainingChats = Object.keys(chatsData);
+                                if (remainingChats.length > 0) {
+                                    switchToChat(remainingChats[0]);
+                                }
+                            }
+                            
+                            updateChatsUI();
+                            showNotification('Чат удален', 'success');
+                        } else {
+                            showNotification(data.error, 'error');
                         }
-                    }
-                    
-                    updateChatsUI();
-                    showNotification('Чат удален', 'success');
-                } else {
-                    showNotification(data.error, 'error');
+                    })
+                    .catch(error => {
+                        showNotification('Ошибка удаления: ' + error.message, 'error');
+                    });
                 }
-            })
-            .catch(error => {
-                showNotification('Ошибка удаления: ' + error.message, 'error');
-            });
+            );
         }
 
         function logout() {
@@ -1231,6 +1256,30 @@
 
         function closeCharacterChangeModal() {
             document.getElementById('characterChangeModal').style.display = 'none';
+        }
+
+        function showConfirmDelete(title, message, confirmCallback) {
+            const modal = document.getElementById('confirmDeleteModal');
+            const titleElement = document.getElementById('confirmDeleteTitle');
+            const messageElement = document.getElementById('confirmDeleteMessage');
+            
+            titleElement.textContent = title;
+            messageElement.textContent = message;
+            
+            pendingDeleteAction = confirmCallback;
+            modal.style.display = 'block';
+        }
+
+        function closeConfirmDeleteModal() {
+            document.getElementById('confirmDeleteModal').style.display = 'none';
+            pendingDeleteAction = null;
+        }
+
+        function confirmDelete() {
+            if (pendingDeleteAction) {
+                pendingDeleteAction();
+                closeConfirmDeleteModal();
+            }
         }
 
         function selectSave(filename, element) {
@@ -1674,49 +1723,60 @@
         function deleteCharacter(filename, event) {
             event.stopPropagation();
 
-            if (!confirm('Удалить этого персонажа?')) return;
-
-            fetch('/delete_character', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({filename: filename})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification('Персонаж удален', 'success');
-                    loadCharacters();
-                } else {
-                    showNotification(data.error, 'error');
+            // Получаем имя персонажа из интерфейса
+            const characterName = event.target.parentElement.querySelector('h4').textContent;
+            
+            showConfirmDelete(
+                'Удаление персонажа',
+                `Вы уверены, что хотите удалить персонажа "${characterName}"? Это действие нельзя отменить.`,
+                () => {
+                    fetch('/delete_character', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({filename: filename})
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotification('Персонаж удален', 'success');
+                            loadCharacters();
+                        } else {
+                            showNotification(data.error, 'error');
+                        }
+                    })
+                    .catch(error => {
+                        showNotification('Ошибка удаления: ' + error.message, 'error');
+                    });
                 }
-            })
-            .catch(error => {
-                showNotification('Ошибка удаления: ' + error.message, 'error');
-            });
+            );
         }
 
         function deleteSave(filename, event) {
             event.stopPropagation();
 
-            if (!confirm('Удалить это сохранение?')) return;
-
-            fetch('/delete_save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({filename: filename})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification('Сохранение удалено', 'success');
-                    loadSaves();
-                } else {
-                    showNotification(data.error, 'error');
+            showConfirmDelete(
+                'Удаление сохранения',
+                `Вы уверены, что хотите удалить сохранение "${filename}"? Это действие нельзя отменить.`,
+                () => {
+                    fetch('/delete_save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({filename: filename})
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotification('Сохранение удалено', 'success');
+                            loadSaves();
+                        } else {
+                            showNotification(data.error, 'error');
+                        }
+                    })
+                    .catch(error => {
+                        showNotification('Ошибка удаления: ' + error.message, 'error');
+                    });
                 }
-            })
-            .catch(error => {
-                showNotification('Ошибка удаления: ' + error.message, 'error');
-            });
+            );
         }
 
         function showNotification(message, type = 'success') {
@@ -1762,12 +1822,16 @@
         window.onclick = function(event) {
             const fileModal = document.getElementById('fileUploadModal');
             const charModal = document.getElementById('characterChangeModal');
+            const deleteModal = document.getElementById('confirmDeleteModal');
             
             if (event.target === fileModal) {
                 closeFileUploadModal();
             }
             if (event.target === charModal) {
                 closeCharacterChangeModal();
+            }
+            if (event.target === deleteModal) {
+                closeConfirmDeleteModal();
             }
         }
 
