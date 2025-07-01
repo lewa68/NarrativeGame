@@ -1134,6 +1134,7 @@
         }
 
         function loadCharacterAndStartGame(filename, characterName) {
+            console.log('Начинаем загрузку персонажа:', filename, 'для чата:', currentChatId);
             showLoading();
             hideStartScreen(); // Сразу показываем чат
 
@@ -1147,9 +1148,11 @@
             })
             .then(response => response.json())
             .then(data => {
+                console.log('Ответ загрузки персонажа:', data);
                 if (data.success) {
                     currentCharacter = data.character;
                     currentCharacterName = data.character_name || characterName;
+                    console.log('Персонаж загружен:', currentCharacterName);
 
                     // Обновляем данные чата с персонажем
                     if (!chatsData[currentChatId]) {
@@ -1167,6 +1170,7 @@
                     updateCurrentCharacterDisplay();
 
                     // Автоматически начинаем игру
+                    console.log('Начинаем игру с персонажем для чата:', currentChatId);
                     return fetch('/start_game_with_character', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1183,8 +1187,10 @@
             })
             .then(response => response.json())
             .then(data => {
+                console.log('Ответ начала игры:', data);
                 hideLoading();
                 if (data.success) {
+                    console.log('Игра успешно началась');
                     // Добавляем сообщения в чат
                     if (!chatsData[currentChatId].messages) {
                         chatsData[currentChatId].messages = [];
