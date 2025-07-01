@@ -16,7 +16,7 @@ from mistralai import Mistral
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-API_KEY = os.environ.get("MISTRAL_API_KEY", "9jJFbEz4dzCmFUoLgOezu1HWl0fD21r6")
+API_KEY = os.environ.get("MISTRAL_API_KEY")
 MODEL = "mistral-large-latest"
 
 app = Flask(__name__)
@@ -162,7 +162,7 @@ def process_content(content):
 
 def chat_with_ai(prompt, system_prompt="", conversation_history=[]):
     if not API_KEY:
-        return "🔑 **Ошибка**: API ключ Mistral не найден"
+        return "🔑 **Ошибка**: API ключ Mistral не найден. Добавьте MISTRAL_API_KEY в Secrets."
 
     try:
         client = Mistral(api_key=API_KEY)
