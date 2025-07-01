@@ -794,15 +794,16 @@ def get_chat_character(chat_data):
         return None, None
     
     character_id = chat_data.get('character_id')
-    if not character_id:
-        # Для обратной совместимости со старыми чатами
-        old_character = chat_data.get('character')
-        old_name = chat_data.get('character_name')
-        return old_character, old_name
+    if character_id and character_id != 'None':
+        char_data = get_character_by_id(character_id)
+        if char_data:
+            return char_data['description'], char_data['name']
     
-    char_data = get_character_by_id(character_id)
-    if char_data:
-        return char_data['description'], char_data['name']
+    # Для обратной совместимости со старыми чатами
+    old_character = chat_data.get('character')
+    old_name = chat_data.get('character_name')
+    if old_character:
+        return old_character, old_name
     
     return None, None
 
@@ -838,6 +839,14 @@ def load_character():
         character_description = character_data['description']
 
         logger.debug(f"Загружен персонаж: {character_name} (ID: {character_id})")
+
+        # Получаем ID персонажа, если его нет - создаем
+        if not character_id:
+            character_id = f"char_{int(datetime.now().timestamp() * 1000)}"
+            # Пересохраняем персонажа с новым ID
+            with open(filepath, 'w', encoding='utf-8') as f:
+                character_data['id'] = character_id
+                json.dump(character_data, f, ensure_ascii=False, indent=2)
 
         # Сохраняем только ID персонажа в чат
         if not chat_data:

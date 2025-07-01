@@ -691,6 +691,10 @@
                 <!-- Персонажи -->
                 <div class="sidebar-section">
                     <h3>👤 Персонажи</h3>
+                    <div id="selected-character-indicator" style="display: none; background: rgba(255,215,0,0.1); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-size: 0.8em;">
+                        <div style="color: #ffd700; font-weight: 600;">✨ Выбран для нового чата:</div>
+                        <div id="selected-character-name"></div>
+                    </div>
                     <div id="characters-list"></div>
                     <button class="action-btn" onclick="openFileUploadModal()">📁 Загрузить файл</button>
                     <button class="action-btn" onclick="createCharacter()">✨ Создать</button>
@@ -858,28 +862,55 @@
             const chatName = nameInput.value.trim() || `Чат ${Date.now()}`;
             const chatId = `chat_${Date.now()}`;
 
-            chatsData[chatId] = {
-                name: chatName,
-                messages: [],
-                character: null,
-                character_name: null,
-                created_at: new Date().toISOString()
-            };
+            // Вариант 1: Если персонаж уже выбран - создаем чат с персонажем
+            if (selectedCharacterFile) {
+                chatsData[chatId] = {
+                    name: chatName,
+                    messages: [],
+                    character_id: null, // Будет установлен при загрузке персонажа
+                    created_at: new Date().toISOString()
+                };
 
-            nameInput.value = '';
-            currentChatId = chatId;
-            currentChatUnsaved = true;
-            
-            currentCharacter = null;
-            currentCharacterName = null;
-            updateCurrentCharacterDisplay();
-            updateStartButton();
+                nameInput.value = '';
+                currentChatId = chatId;
+                currentChatUnsaved = true;
 
-            updateChatsUI();
-            clearMessages();
-            clearSelections();
-            showStartScreen();
-            showNotification(`Создан новый чат: ${chatName}`, 'success');
+                updateChatsUI();
+                clearMessages();
+                
+                // Автоматически загружаем выбранного персонажа в новый чат
+                const characterName = document.querySelector(`[onclick*="'${selectedCharacterFile}'"]`)?.querySelector('h4')?.textContent || 'Персонаж';
+                loadCharacterAndStartGame(selectedCharacterFile, characterName);
+                clearSelections();
+                showNotification(`Создан новый чат "${chatName}" с персонажем`, 'success');
+            } else {
+                // Вариант 2: Создаем пустой чат без персонажа
+                chatsData[chatId] = {
+                    name: chatName,
+                    messages: [],
+                    character_id: null,
+                    created_at: new Date().toISOString()
+                };
+
+                nameInput.value = '';
+                currentChatId = chatId;
+                currentChatUnsaved = true;
+                
+                currentCharacter = null;
+                currentCharacterName = null;
+                updateCurrentCharacterDisplay();
+
+                updateChatsUI();
+                clearMessages();
+                clearSelections();
+                showStartScreen();
+                showNotification(`Создан новый чат: ${chatName}`, 'success');
+            }
+        }
+
+        function updateStartButton() {
+            // Эта функция была вызывается, но не была определена
+            // Пока оставляем пустой, так как логика стартового экрана работает через другие функции
         }
 
         function switchToChat(chatId) {
@@ -1075,14 +1106,27 @@
         }
 
         function selectCharacter(filename, name, element) {
-            clearSelections();
-            element.classList.add('selected');
-
-            selectedCharacterFile = filename;
-            selectedSaveFile = null;
-
-            // Автоматически начинаем игру с выбранным персонажем
-            loadCharacterAndStartGame(filename, name);
+            // Проверяем, есть ли текущий чат и есть ли в нем уже персонаж
+            const currentChat = chatsData[currentChatId];
+            
+            if (currentChat && currentChat.character_id) {
+                // Если в текущем чате уже есть персонаж - предлагаем создать новый чат
+                if (confirm(`В текущем чате уже выбран персонаж. Создать новый чат с персонажем "${name}"?`)) {
+                    clearSelections();
+                    element.classList.add('selected');
+                    selectedCharacterFile = filename;
+                    selectedSaveFile = null;
+                    updateSelectedCharacterIndicator(name);
+                    createNewChat(); // Создастся с выбранным персонажем (вариант 1)
+                }
+            } else {
+                // Если в текущем чате нет персонажа - загружаем персонажа в текущий чат
+                clearSelections();
+                element.classList.add('selected');
+                selectedCharacterFile = filename;
+                selectedSaveFile = null;
+                loadCharacterAndStartGame(filename, name);
+            }
         }
 
         function selectSave(filename, element) {
@@ -1099,6 +1143,23 @@
             document.querySelectorAll('.list-item').forEach(item => {
                 item.classList.remove('selected');
             });
+            selectedCharacterFile = null;
+            selectedSaveFile = null;
+            
+            // Скрываем индикатор выбранного персонажа
+            document.getElementById('selected-character-indicator').style.display = 'none';
+        }
+
+        function updateSelectedCharacterIndicator(characterName) {
+            const indicator = document.getElementById('selected-character-indicator');
+            const nameElement = document.getElementById('selected-character-name');
+            
+            if (selectedCharacterFile && characterName) {
+                nameElement.textContent = characterName;
+                indicator.style.display = 'block';
+            } else {
+                indicator.style.display = 'none';
+            }
         }
 
         function loadCharacterOnly(filename) {
