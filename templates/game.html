@@ -1547,10 +1547,18 @@
 
         function hideLoading() {
             // Удаляем все элементы загрузки (может быть несколько)
-            const loadingElements = document.querySelectorAll('.loading');
+            const loadingElements = document.querySelectorAll('.loading, #loading');
             loadingElements.forEach(loading => {
-                loading.remove();
+                if (loading && loading.parentNode) {
+                    loading.parentNode.removeChild(loading);
+                }
             });
+            
+            // Дополнительная очистка по ID
+            const loadingById = document.getElementById('loading');
+            if (loadingById) {
+                loadingById.remove();
+            }
         }
 
         function showError(message) {
@@ -1839,6 +1847,14 @@
         document.addEventListener('click', function(e) {
             if (window.innerWidth <= 768 && e.target.closest('.list-item')) {
                 setTimeout(closeSidebar, 300);
+            }
+        });
+
+        // Обрабатываем возврат на вкладку - очищаем зависшие индикаторы загрузки
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                // Когда пользователь возвращается на вкладку - очищаем все загрузки
+                setTimeout(hideLoading, 100);
             }
         });
     </script>
