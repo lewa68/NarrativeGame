@@ -1337,6 +1337,7 @@
 
                     // Автоматически начинаем игру
                     console.log('Начинаем игру с персонажем для чата:', currentChatId);
+                    showLoading(); // Показываем индикатор загрузки перед запросом
                     return fetch('/start_game_with_character', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
