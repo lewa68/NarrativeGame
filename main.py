@@ -516,8 +516,6 @@ def send_message():
     chat_id = data.get('chat_id', 'default')
 
     logger.debug(f"send_message вызван: message='{user_message}', chat_id='{chat_id}'")
-    logger.debug(f"session['character']: {session.get('character', 'НЕТ')}")
-    logger.debug(f"session['character_name']: {session.get('character_name', 'НЕТ')}")
 
     if not user_message:
         logger.warning("Попытка отправить пустое сообщение")
@@ -535,23 +533,15 @@ def send_message():
         logger.debug("Запрос на создание персонажа")
         return create_character_start(chat_id)
 
-    # Проверяем персонажа в чате и сессии
+    # Проверяем персонажа в чате
     chat_data = load_chat_data(chat_id)
-    session_character = session.get('character')
     chat_character = chat_data.get('character') if chat_data else None
     
-    logger.debug(f"Проверка персонажа: session_character={bool(session_character)}, chat_character={bool(chat_character)}")
-    
-    # Используем персонажа из чата, если он есть
-    if chat_character and not session_character:
-        logger.debug("Восстанавливаем персонажа из чата")
-        session['character'] = chat_character
-        session['character_name'] = chat_data.get('character_name', 'Персонаж')
-        session_character = chat_character
+    logger.debug(f"Проверка персонажа в чате: {bool(chat_character)}")
 
     # Проверяем, есть ли персонаж
-    if not session_character and not chat_character:
-        logger.warning("Персонаж не найден ни в сессии, ни в чате")
+    if not chat_character:
+        logger.warning("Персонаж не найден в чате")
         return jsonify({
             "response": "⚠️ Сначала нужно создать или загрузить персонажа! Напишите 'создать персонажа' или выберите персонажа из списка."
         })
@@ -560,8 +550,7 @@ def send_message():
     system_prompt = session.get('system_prompt', '')
 
     # Добавляем информацию о персонаже в контекст
-    character_info = session.get('character')
-    enhanced_prompt = f"{user_message}\n\n[ПЕРСОНАЖ ИГРОКА: {character_info}]"
+    enhanced_prompt = f"{user_message}\n\n[ПЕРСОНАЖ ИГРОКА: {chat_character}]"
 
     response = chat_with_ai(enhanced_prompt, system_prompt, conversation_history)
 
@@ -773,7 +762,7 @@ def save_character_to_file(character_description, character_name=None):
 @app.route('/load_character', methods=['POST'])
 @login_required
 def load_character():
-    """Загружает персонажа из сохраненных БЕЗ автоматического начала игры"""
+    """Загружает персонажа из сохраненных и сохраняет в чат"""
     data = request.get_json()
     filename = data.get('filename')
     chat_id = data.get('chat_id', 'default')
@@ -803,16 +792,27 @@ def load_character():
 
         logger.debug(f"Загружен персонаж: {character_name}")
 
-        session['character'] = character_description
-        session['character_name'] = character_name
-        session['current_chat_id'] = chat_id
+        # Сохраняем персонажа в чат (НЕ в сессию)
+        if not chat_data:
+            chat_data = {
+                "name": f"Чат {character_name}",
+                "messages": [],
+                "character": character_description,
+                "character_name": character_name,
+                "created_at": datetime.now().isoformat()
+            }
+        else:
+            chat_data['character'] = character_description
+            chat_data['character_name'] = character_name
+
+        save_chat_file(chat_id, chat_data)
 
         # Загружаем правила ГМ для будущего использования
         rules = load_gm_rules()
         system_prompt = create_gm_system_prompt(rules)
         session['system_prompt'] = system_prompt
 
-        logger.info(f"Персонаж '{character_name}' успешно загружен в сессию")
+        logger.info(f"Персонаж '{character_name}' успешно сохранен в чат {chat_id}")
 
         return jsonify({
             "success": True,
@@ -848,15 +848,15 @@ def start_game_with_character():
     chat_id = data.get('chat_id', 'default')
 
     logger.debug(f"start_game_with_character вызван для chat_id='{chat_id}'")
-    logger.debug(f"session['character']: {bool(session.get('character'))}")
-    logger.debug(f"session['character_name']: {session.get('character_name', 'НЕТ')}")
 
-    if not session.get('character'):
-        logger.error("Персонаж не найден в сессии при попытке начать игру")
+    # Загружаем данные чата для проверки персонажа
+    chat_data = load_chat_data(chat_id)
+    if not chat_data or not chat_data.get('character'):
+        logger.error(f"Персонаж не найден в чате {chat_id}")
         return jsonify({"error": "Персонаж не выбран"})
 
-    character = session.get('character')
-    character_name = session.get('character_name', 'Персонаж')
+    character = chat_data['character']
+    character_name = chat_data.get('character_name', 'Персонаж')
     
     logger.info(f"Начинаем игру с персонажем: {character_name}")
     
@@ -874,18 +874,6 @@ def start_game_with_character():
         chat_name = create_chat_name_from_response(response)
         
         # Обновляем данные чата
-        chat_data = load_chat_data(chat_id)
-        if not chat_data:
-            chat_data = {
-                "name": chat_name,
-                "messages": [],
-                "character": character,
-                "character_name": character_name,
-                "created_at": datetime.now().isoformat()
-            }
-
-        chat_data['character'] = character
-        chat_data['character_name'] = character_name
         chat_data['name'] = chat_name
 
         # Добавляем сообщения
