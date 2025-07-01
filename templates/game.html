@@ -979,8 +979,8 @@
                 chatsData[chatId] = {
                     name: 'Новый чат',
                     messages: [],
-                    character: null,
-                    character_name: null
+                    character_id: null,
+                    created_at: new Date().toISOString()
                 };
                 clearMessages();
                 currentCharacter = null;
@@ -992,16 +992,41 @@
 
             clearMessages();
 
-            // Устанавливаем текущего персонажа из данных чата
-            if (chatData.character) {
-                currentCharacter = chatData.character;
-                currentCharacterName = chatData.character_name || 'Персонаж';
+            // Получаем персонажа через ID
+            const character_id = chatData.character_id;
+            if (character_id && character_id !== 'None') {
+                // Загружаем персонажа по ID
+                fetch('/get_character_by_id', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ character_id: character_id })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentCharacter = data.character;
+                        currentCharacterName = data.character_name;
+                        updateCurrentCharacterDisplay();
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки персонажа:', error);
+                });
             } else {
-                currentCharacter = null;
-                currentCharacterName = null;
+                // Для обратной совместимости со старыми чатами
+                if (chatData.character) {
+                    currentCharacter = chatData.character;
+                    currentCharacterName = chatData.character_name || 'Персонаж';
+                } else {
+                    currentCharacter = null;
+                    currentCharacterName = null;
+                }
             }
 
             updateCurrentCharacterDisplay();
+
+            // Всегда показываем интерфейс чата, даже если он пустой
+            hideStartScreen();
 
             // Загружаем сообщения если они есть
             if (chatData.messages && chatData.messages.length > 0) {
@@ -1012,8 +1037,10 @@
                         addMessage('gm', msg.content);
                     }
                 });
-                hideStartScreen();
-            } else {
+            }
+
+            // Показываем стартовый экран только если нет персонажа И нет сообщений
+            if (!currentCharacter && (!chatData.messages || chatData.messages.length === 0)) {
                 showStartScreen();
             }
         }

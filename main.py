@@ -1047,6 +1047,26 @@ def delete_character():
     except Exception as e:
         return jsonify({"error": f"Ошибка удаления персонажа: {str(e)}"})
 
+@app.route('/get_character_by_id', methods=['POST'])
+@login_required
+def get_character_by_id_route():
+    """Получает персонажа по ID"""
+    data = request.get_json()
+    character_id = data.get('character_id')
+
+    if not character_id:
+        return jsonify({"error": "ID персонажа не указан"})
+
+    character_data = get_character_by_id(character_id)
+    if character_data:
+        return jsonify({
+            "success": True,
+            "character": character_data['description'],
+            "character_name": character_data['name']
+        })
+    else:
+        return jsonify({"error": "Персонаж не найден"})
+
 @app.route('/delete_save', methods=['POST'])
 @login_required
 def delete_save():
