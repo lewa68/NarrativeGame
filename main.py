@@ -1,5 +1,3 @@
-import pip
-pip.main(['install', 'flask', 'requests', 'mistralai','werkzeug'])
 import requests
 import json
 import os
