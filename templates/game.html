@@ -1536,29 +1536,29 @@
         }
 
         function showLoading() {
+            // Сначала удаляем все существующие индикаторы загрузки
+            hideLoading();
+            
             const messages = document.getElementById('messages');
             const loadingDiv = document.createElement('div');
-            loadingDiv.id = 'loading';
-            loadingDiv.className = 'loading';
+            loadingDiv.id = 'gm-loading';
+            loadingDiv.className = 'loading gm-loading-indicator';
             loadingDiv.textContent = '🤔 ГМ размышляет...';
             messages.appendChild(loadingDiv);
             messages.scrollTop = messages.scrollHeight;
         }
 
         function hideLoading() {
-            // Удаляем все элементы загрузки (может быть несколько)
-            const loadingElements = document.querySelectorAll('.loading, #loading');
-            loadingElements.forEach(loading => {
-                if (loading && loading.parentNode) {
-                    loading.parentNode.removeChild(loading);
-                }
+            // Удаляем все элементы загрузки по всем возможным селекторам
+            const selectors = ['.loading', '#loading', '#gm-loading', '.gm-loading-indicator'];
+            selectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(element => {
+                    if (element && element.parentNode) {
+                        element.parentNode.removeChild(element);
+                    }
+                });
             });
-            
-            // Дополнительная очистка по ID
-            const loadingById = document.getElementById('loading');
-            if (loadingById) {
-                loadingById.remove();
-            }
         }
 
         function showError(message) {
@@ -1854,8 +1854,16 @@
         document.addEventListener('visibilitychange', function() {
             if (!document.hidden) {
                 // Когда пользователь возвращается на вкладку - очищаем все загрузки
-                setTimeout(hideLoading, 100);
+                setTimeout(() => {
+                    hideLoading();
+                    console.log('Очищены индикаторы загрузки при возврате на вкладку');
+                }, 100);
             }
+        });
+
+        // Дополнительная очистка при фокусе окна
+        window.addEventListener('focus', function() {
+            setTimeout(hideLoading, 50);
         });
     </script>
 </body>
