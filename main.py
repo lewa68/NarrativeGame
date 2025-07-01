@@ -705,40 +705,48 @@ def create_character_continue(user_input, chat_id='default'):
 
     return jsonify({"response": response, "character_created": False})
 
-def save_character_to_file(character_description):
+def save_character_to_file(character_description, character_name=None):
     """Сохраняет персонажа в файл"""
     try:
-        # Извлекаем имя персонажа
-        lines = character_description.split('\n')
-        character_name = "Безымянный"
-        for line in lines:
-            if line.startswith('Имя:'):
-                character_name = line.replace('Имя:', '').strip()
-                break
+        if not character_name:
+            # Извлекаем имя персонажа
+            lines = character_description.split('\n')
+            character_name = "Безымянный"
+            for line in lines:
+                if line.startswith('Имя:'):
+                    character_name = line.replace('Имя:', '').strip()
+                    break
 
         user_folder = get_user_folder(session['username'], session['user_id'])
         characters_folder = os.path.join(user_folder, "characters")
 
+        # Генерируем уникальный ID
+        character_id = f"char_{int(datetime.now().timestamp() * 1000)}"
+
         character_data = {
+            "id": character_id,
             "name": character_name,
             "description": character_description,
             "created_at": datetime.now().isoformat()
         }
 
-        # Создаем безопасное имя файла
+        # Создаем безопасное имя файла БЕЗ системных цифр
         safe_name = "".join(c for c in character_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-        filename = f"{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        filename = f"{safe_name}.json"
 
         with open(os.path.join(characters_folder, filename), 'w', encoding='utf-8') as f:
             json.dump(character_data, f, ensure_ascii=False, indent=2)
 
+        return filename[:-5]  # Возвращаем имя без .json
+
     except Exception as e:
         print(f"Ошибка сохранения персонажа: {e}")
+        return None
 
 @app.route('/load_character', methods=['POST'])
 @login_required
 def load_character():
-    """Загружает персонажа из сохраненных и начинает игру"""
+    """Загружает персонажа из сохраненных БЕЗ автоматического начала игры"""
     data = request.get_json()
     filename = data.get('filename')
     chat_id = data.get('chat_id', 'default')
@@ -758,62 +766,24 @@ def load_character():
         with open(filepath, 'r', encoding='utf-8') as f:
             character_data = json.load(f)
 
-        # Извлекаем имя из названия файла
-        character_name = filename.replace('_', ' ')
+        # Используем имя из файла
+        character_name = character_data.get('name', filename)
 
         session['character'] = character_data['description']
         session['character_name'] = character_name
         session['current_chat_id'] = chat_id
 
-        # Загружаем правила ГМ
+        # Загружаем правила ГМ для будущего использования
         rules = load_gm_rules()
         system_prompt = create_gm_system_prompt(rules)
         session['system_prompt'] = system_prompt
 
-        # Автоматически начинаем игру
-        enhanced_prompt = f"Начни игру\n\n[ПЕРСОНАЖ ИГРОКА: {character_data['description']}]"
-        response = chat_with_ai(enhanced_prompt, system_prompt, [])
-
-        if response and response.strip():
-            # Создаем название чата из первых слов ответа
-            chat_name = create_chat_name_from_response(response)
-            
-            # Обновляем данные чата
-            if not chat_data:
-                chat_data = {
-                    "name": chat_name,
-                    "messages": [],
-                    "character": character_data['description'],
-                    "character_name": character_name,
-                    "created_at": datetime.now().isoformat()
-                }
-
-            chat_data['character'] = character_data['description']
-            chat_data['character_name'] = character_name
-            chat_data['name'] = chat_name
-
-            # Добавляем сообщения
-            messages = [
-                {"role": "user", "content": "Начни игру", "timestamp": datetime.now().isoformat()},
-                {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
-            ]
-            chat_data['messages'] = messages
-
-            # Сохраняем чат
-            save_chat_file(chat_id, chat_data)
-            
-            # Обновляем сессию
-            session['conversation_history'] = messages
-
-            return jsonify({
-                "success": True,
-                "character": character_data['description'],
-                "character_name": character_name,
-                "response": response,
-                "chat_name": chat_name,
-                "game_started": True,
-                "message": f"Персонаж '{character_name}' загружен и игра началась"
-            })
+        return jsonify({
+            "success": True,
+            "character": character_data['description'],
+            "character_name": character_name,
+            "message": f"Персонаж '{character_name}' выбран"
+        })
 
     except FileNotFoundError:
         return jsonify({"error": "Файл персонажа не найден"})
@@ -833,6 +803,69 @@ def create_chat_name_from_response(response):
         chat_name = chat_name[:27] + '...'
     
     return chat_name or "Новое приключение"
+
+@app.route('/start_game_with_character', methods=['POST'])
+@login_required
+def start_game_with_character():
+    """Начинает игру с уже выбранным персонажем"""
+    data = request.get_json()
+    chat_id = data.get('chat_id', 'default')
+
+    if not session.get('character'):
+        return jsonify({"error": "Персонаж не выбран"})
+
+    character = session.get('character')
+    character_name = session.get('character_name', 'Персонаж')
+    
+    # Загружаем правила ГМ
+    rules = load_gm_rules()
+    system_prompt = create_gm_system_prompt(rules)
+    session['system_prompt'] = system_prompt
+
+    # Начинаем игру
+    enhanced_prompt = f"Начни игру\n\n[ПЕРСОНАЖ ИГРОКА: {character}]"
+    response = chat_with_ai(enhanced_prompt, system_prompt, [])
+
+    if response and response.strip():
+        # Создаем название чата из первых слов ответа
+        chat_name = create_chat_name_from_response(response)
+        
+        # Обновляем данные чата
+        chat_data = load_chat_data(chat_id)
+        if not chat_data:
+            chat_data = {
+                "name": chat_name,
+                "messages": [],
+                "character": character,
+                "character_name": character_name,
+                "created_at": datetime.now().isoformat()
+            }
+
+        chat_data['character'] = character
+        chat_data['character_name'] = character_name
+        chat_data['name'] = chat_name
+
+        # Добавляем сообщения
+        messages = [
+            {"role": "user", "content": "Начни игру", "timestamp": datetime.now().isoformat()},
+            {"role": "assistant", "content": response, "timestamp": datetime.now().isoformat()}
+        ]
+        chat_data['messages'] = messages
+
+        # Сохраняем чат
+        save_chat_file(chat_id, chat_data)
+        
+        # Обновляем сессию
+        session['conversation_history'] = messages
+
+        return jsonify({
+            "success": True,
+            "response": response,
+            "chat_name": chat_name,
+            "game_started": True
+        })
+
+    return jsonify({"error": "Не удалось начать игру"})
 
 @app.route('/save_game', methods=['POST'])
 @login_required
@@ -952,36 +985,43 @@ def delete_save():
 @app.route('/upload_character', methods=['POST'])
 @login_required
 def upload_character():
-    """Загружает файл персонажа"""
-    if 'character_file' not in request.files:
-        return jsonify({"error": "Файл не выбран"})
+    """Загружает файл персонажа с пользовательским именем"""
+    data = request.get_json()
+    file_content = data.get('file_content')
+    character_name = data.get('character_name', '').strip()
 
-    file = request.files['character_file']
-    if file.filename == '':
-        return jsonify({"error": "Файл не выбран"})
+    if not file_content:
+        return jsonify({"error": "Содержимое файла не получено"})
+
+    if not character_name:
+        return jsonify({"error": "Имя персонажа не указано"})
 
     try:
-        # Читаем содержимое файла
-        content = file.read().decode('utf-8')
-
         # Пытаемся распарсить как JSON
         try:
-            character_data = json.loads(content)
+            character_data = json.loads(file_content)
             # Создаем читаемое описание персонажа
             character_description = format_character_description(character_data)
         except json.JSONDecodeError:
             # Если не JSON, используем как текст
-            character_description = content
+            character_description = file_content
 
-        session['character'] = character_description
+        # Сохраняем персонажа с указанным именем
+        filename = save_character_to_file(character_description, character_name)
 
-        # Сохраняем загруженного персонажа
-        save_character_to_file(character_description)
-
-        return jsonify({"success": True, "character": character_description, "message": "Персонаж загружен успешно"})
+        if filename:
+            return jsonify({
+                "success": True, 
+                "character": character_description,
+                "character_name": character_name,
+                "filename": filename,
+                "message": f"Персонаж '{character_name}' сохранен успешно"
+            })
+        else:
+            return jsonify({"error": "Ошибка сохранения персонажа"})
 
     except Exception as e:
-        return jsonify({"error": f"Ошибка при загрузке файла: {str(e)}"})
+        return jsonify({"error": f"Ошибка при обработке файла: {str(e)}"})
 
 def format_character_description(character_data):
     """Форматирует данные персонажа из JSON в читаемый текст"""
