@@ -1,0 +1,17 @@
+{
+  "name": "❌ Ошибка Mistral AI:",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Начни игру",
+      "timestamp": "2025-07-01T11:04:26.063244"
+    },
+    {
+      "role": "assistant",
+      "content": "❌ **Ошибка Mistral AI**: name 'CONTEXT_CONFIG' is not defined",
+      "timestamp": "2025-07-01T11:04:26.063252"
+    }
+  ],
+  "character_id": "char_1751349487453",
+  "created_at": "2025-07-01T11:04:25.321625"
+}
